@@ -1,0 +1,10 @@
+  
+/* 样式编辑器紧凑布局 */  
+.style-editor-compact-row {  
+  display: flex;  
+  align-items: center;  
+  gap: 8px;  
+  padding: 8px 10px;  
+  font-size: 12px;  
+  border-bottom: 1px solid var(--border-light);  
+} 

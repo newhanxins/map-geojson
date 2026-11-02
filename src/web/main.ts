@@ -7,6 +7,10 @@
 import '../styles/main.css';
 import '../styles/sidebar.css';
 import '../styles/toolbar.css';
+import '../styles/compact-layout.css';
+import '../styles/edit-tools.css';
+import '../styles/feature-card.css';
+import '../styles/map-toolbar.css';
 
 // MapLibre GL CSS (通过 link 标签在 HTML 中加载)
 

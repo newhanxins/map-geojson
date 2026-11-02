@@ -1,0 +1,92 @@
+/* 样式编辑器紧凑布局 */
+.style-editor-compact-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border-light);
+  min-height: 36px;
+}
+
+.style-editor-compact-row:last-child {
+  border-bottom: none;
+}
+
+.compact-label {
+  min-width: 35px;
+  width: 35px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  text-align: center;
+  line-height: 1;
+}
+
+.compact-color {
+  width: 32px;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.compact-range {
+  flex: 1;
+  height: 6px;
+  background: #cbd5e0;
+  border-radius: 3px;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  outline: none;
+  margin: 0;
+}
+
+.compact-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  margin-top: -5px;
+}
+
+.compact-range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
+.compact-range::-webkit-slider-runnable-track {
+  height: 6px;
+  background: #cbd5e0;
+  border-radius: 3px;
+}
+
+.compact-range::-moz-range-track {
+  height: 6px;
+  background: #cbd5e0;
+  border-radius: 3px;
+}
+
+.compact-value {
+  min-width: 40px;
+  width: 40px;
+  text-align: right;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-family: monospace;
+  flex-shrink: 0;
+  line-height: 1;
+}

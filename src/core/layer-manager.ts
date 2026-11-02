@@ -53,9 +53,10 @@ export class LayerManager {
 
     this.layers.push(layer);
 
-    // 如果是第一个图层，自动激活
+    // 如果是第一个图层，自动激活（但不展开详情）
     if (this.layers.length === 1) {
-      this.activeLayerId = id;
+      // 不设置 activeLayerId，保持折叠状态
+      this.activeLayerId = null;
     }
 
     return layer;

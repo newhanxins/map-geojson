@@ -1,0 +1,243 @@
+/* ==================== 要素信息卡片 ==================== */
+
+.feature-info-card {
+  margin: 8px;
+  border-radius: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.feature-info-card.collapsed .feature-details {
+  display: none;
+}
+
+.feature-info-card.collapsed .feature-toggle-btn span {
+  transform: rotate(-90deg);
+}
+
+/* 要素头部 */
+.feature-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 12px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.feature-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.feature-type-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  background: linear-gradient(135deg, #4f8cff 0%, #667eea 100%);
+  color: white;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.feature-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.feature-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feature-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.feature-meta span {
+  opacity: 0.8;
+}
+
+.feature-toggle-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 14px;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.feature-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--color-primary);
+}
+
+.feature-toggle-btn span {
+  transition: transform 0.2s;
+}
+
+/* 要素详细内容 */
+.feature-details {
+  padding: 12px;
+}
+
+.feature-no-props {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 16px 0;
+}
+
+/* 统计信息 */
+.feature-stats {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.feature-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.feature-stat-item .stat-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.feature-stat-item .stat-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary);
+  font-family: var(--font-mono);
+}
+
+/* 属性列表 */
+.feature-properties {
+  margin-top: 8px;
+}
+
+.properties-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  user-select: none;
+  transition: color 0.2s;
+}
+
+.properties-section-header:hover {
+  color: var(--color-primary);
+}
+
+.properties-section-header .toggle-icon {
+  font-size: 12px;
+  transition: transform 0.2s;
+}
+
+.properties-content.collapsed {
+  display: none;
+}
+
+.properties-content.collapsed + .toggle-icon {
+  transform: rotate(-90deg);
+}
+
+/* 属性表格 */
+.prop-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  margin-top: 8px;
+}
+
+.prop-table tr {
+  border-bottom: 1px solid var(--border-light);
+}
+
+.prop-table tr:last-child {
+  border-bottom: none;
+}
+
+.prop-table .prop-key {
+  padding: 6px 8px;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: var(--bg-app);
+  white-space: nowrap;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.prop-table .prop-value {
+  padding: 6px 8px;
+  font-family: var(--font-mono);
+  color: var(--color-primary);
+  word-break: break-all;
+  font-size: 10px;
+}
+
+/* 显示更多属性 */
+.more-properties {
+  margin-top: 8px;
+}
+
+.show-more-btn {
+  width: 100%;
+  padding: 6px 12px;
+  border: 1px dashed var(--border-medium);
+  border-radius: 4px;
+  background: var(--bg-app);
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.show-more-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.more-properties.expanded .show-more-btn {
+  display: none;
+}
+
+.hidden-properties {
+  margin-top: 8px;
+}
+
+.hidden-properties.collapsed {
+  display: none;
+}

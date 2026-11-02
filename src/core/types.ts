@@ -45,6 +45,8 @@ export interface GeoLayer {
   simplifiedData?: GeoJSONFeatureCollection;
   /** 当前简化比例 (0-1, 0=无简化) */
   simplifyRatio?: number;
+  /** 自定义样式（可选） */
+  style?: LayerStyle;
 }
 
 /** 图层统计信息 */
@@ -119,7 +121,7 @@ export const DEFAULT_LAYER_STYLE: LayerStyle = {
   fillOpacity: 0.25,
   strokeColor: '#4f8cff',
   strokeWidth: 2,
-  strokeOpacity: 1,
+  strokeOpacity: 0.8,
   pointRadius: 5,
   pointColor: '#4f8cff',
 };

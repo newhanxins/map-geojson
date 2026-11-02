@@ -1,0 +1,139 @@
+/* ==================== 地图右侧编辑工具栏 ==================== */
+
+.map-edit-toolbar {
+  position: absolute;
+  top: 80px;
+  right: 10px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+  padding: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+.map-tool-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  color: var(--text-secondary);
+  padding: 2px;
+}
+
+.map-tool-btn span:first-child {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.map-tool-btn .tool-label {
+  font-size: 9px;
+  margin-top: 2px;
+  line-height: 1;
+  color: inherit;
+}
+
+.map-tool-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  transform: scale(1.05);
+}
+
+.map-tool-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.map-tool-btn.active {
+  background: linear-gradient(135deg, #4f8cff 0%, #667eea 100%);
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 2px 8px rgba(79, 140, 255, 0.4);
+}
+
+.map-tool-btn.btn-danger:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+/* ==================== 顶点坐标面板（右侧面板底部） ==================== */
+
+.vertex-coord-panel {
+  border-top: 2px solid var(--color-primary, #4f8cff);
+  background: var(--bg-primary, #fff);
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.vertex-coord-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary, #4f8cff);
+  background: rgba(79, 140, 255, 0.06);
+  border-bottom: 1px solid var(--border-light, #f0f0f0);
+}
+
+.vertex-coord-header .vertex-index {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted, #999);
+  background: var(--bg-hover, #f5f5f5);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.vertex-coord-body {
+  padding: 10px 14px;
+}
+
+.coord-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.coord-label {
+  font-size: 11px;
+  color: var(--text-muted, #999);
+  width: 40px;
+  flex-shrink: 0;
+}
+
+.coord-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary, #333);
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.3px;
+  transition: color 0.15s ease;
+}
+
+.coord-value.updating {
+  color: var(--color-primary, #4f8cff);
+}
+
+.coord-hint {
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--text-muted, #999);
+  text-align: center;
+  font-style: italic;
+}

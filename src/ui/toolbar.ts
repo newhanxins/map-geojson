@@ -26,13 +26,10 @@ export class Toolbar {
       </div>
 
       <div class="toolbar-actions">
-        <button class="btn btn-primary" id="btnImport">
-          <span>&#128194;</span> 导入
-        </button>
-
+        <!-- 导入（单击弹出菜单） -->
         <div class="dropdown" id="importDropdown">
-          <button class="btn" id="btnImportDropdown">
-            <span>&#9662;</span>
+          <button class="btn btn-primary" id="btnImportDropdown">
+            <span>&#128194;</span> 导入 <span>&#9662;</span>
           </button>
           <div class="dropdown-menu" id="importMenu">
             <div class="dropdown-menu-item" data-action="import-file">
@@ -51,34 +48,19 @@ export class Toolbar {
           </div>
         </div>
 
-        <div class="toolbar-divider"></div>
-
-        <div class="dropdown" id="exportDropdown">
-          <button class="btn" id="btnExport">
-            <span>&#128190;</span> 导出 <span>&#9662;</span>
-          </button>
-          <div class="dropdown-menu" id="exportMenu">
-            <div class="dropdown-menu-item" data-action="export-geojson">
-              <span class="item-icon">&#128196;</span> 导出 GeoJSON
-            </div>
-            <div class="dropdown-menu-item" data-action="export-topojson">
-              <span class="item-icon">&#128196;</span> 导出 TopoJSON
-            </div>
-            <div class="dropdown-menu-divider"></div>
-            <div class="dropdown-menu-item" data-action="copy-json">
-              <span class="item-icon">&#128203;</span> 复制 JSON
-            </div>
-          </div>
-        </div>
+        <!-- 导出按钮 -->
+        <button class="btn btn-success" id="btnExport" title="导出数据">
+          <span>&#128190;</span> 导出
+        </button>
 
         <div class="toolbar-divider"></div>
 
         <button class="btn" id="btnSimplify">
-          <span>&#9998;</span> 简化
+          <span>&#9881;</span> 简化
         </button>
 
         <button class="btn" id="btnFitAll" title="Fit to all layers">
-          <span>&#128269;</span> 适配全部
+          <span>&#128269;</span> 适配
         </button>
 
         <button class="btn" id="btnClearAll" title="Clear all layers">
@@ -90,12 +72,7 @@ export class Toolbar {
 
   /** 绑定事件 */
   private bindEvents(): void {
-    // 主导入按钮（打开文件选择）
-    document.getElementById('btnImport')?.addEventListener('click', () => {
-      this.callbacks.onImportFile();
-    });
-
-    // 导入下拉菜单
+    // 导入下拉菜单（单击打开菜单）
     this.setupDropdown('btnImportDropdown', 'importMenu');
     document.querySelector('[data-action="import-file"]')?.addEventListener('click', () => {
       this.callbacks.onImportFile();
@@ -114,19 +91,9 @@ export class Toolbar {
       this.closeAllDropdowns();
     });
 
-    // 导出下拉菜单
-    this.setupDropdown('btnExport', 'exportMenu');
-    document.querySelector('[data-action="export-geojson"]')?.addEventListener('click', () => {
-      this.callbacks.onExportGeoJSON();
-      this.closeAllDropdowns();
-    });
-    document.querySelector('[data-action="export-topojson"]')?.addEventListener('click', () => {
-      this.callbacks.onExportTopoJSON();
-      this.closeAllDropdowns();
-    });
-    document.querySelector('[data-action="copy-json"]')?.addEventListener('click', () => {
-      this.callbacks.onCopyJSON();
-      this.closeAllDropdowns();
+    // 导出按钮 - 显示导出弹窗
+    document.getElementById('btnExport')?.addEventListener('click', () => {
+      this.showExportModal();
     });
 
     // 简化按钮
@@ -144,6 +111,7 @@ export class Toolbar {
       this.callbacks.onClearAll();
     });
 
+    // 编辑工具
     // 点击外部关闭下拉菜单
     document.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
@@ -252,6 +220,65 @@ export class Toolbar {
       if (e.target === overlay) close();
     });
   }
+
+  /** 显示导出弹窗 */
+  private showExportModal(): void {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal export-modal">
+        <h2>导出数据</h2>
+        <div class="export-options">
+          <div class="export-option" data-action="export-geojson">
+            <div class="export-option-icon">&#128196;</div>
+            <div class="export-option-content">
+              <div class="export-option-title">GeoJSON</div>
+              <div class="export-option-desc">标准 GeoJSON 格式文件</div>
+            </div>
+          </div>
+          <div class="export-option" data-action="export-topojson">
+            <div class="export-option-icon">&#128196;</div>
+            <div class="export-option-content">
+              <div class="export-option-title">TopoJSON</div>
+              <div class="export-option-desc">压缩后的拓扑格式</div>
+            </div>
+          </div>
+          <div class="export-option" data-action="export-json">
+            <div class="export-option-icon">&#128196;</div>
+            <div class="export-option-content">
+              <div class="export-option-title">JSON</div>
+              <div class="export-option-desc">导出为 JSON 格式文件</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" id="exportCancel">取消</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+
+    // 绑定导出选项事件
+    overlay.querySelector('[data-action="export-geojson"]')?.addEventListener('click', () => {
+      this.callbacks.onExportGeoJSON();
+      close();
+    });
+    overlay.querySelector('[data-action="export-topojson"]')?.addEventListener('click', () => {
+      this.callbacks.onExportTopoJSON();
+      close();
+    });
+    overlay.querySelector('[data-action="export-json"]')?.addEventListener('click', () => {
+      this.callbacks.onExportJSON();
+      close();
+    });
+
+    document.getElementById('exportCancel')?.addEventListener('click', close);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
+  }
 }
 
 /** 工具栏回调接口 */
@@ -262,7 +289,7 @@ interface ToolbarCallbacks {
   onLoadSample(): void;
   onExportGeoJSON(): void;
   onExportTopoJSON(): void;
-  onCopyJSON(): void;
+  onExportJSON(): void;
   onToggleSimplify(): void;
   onFitAll(): void;
   onClearAll(): void;

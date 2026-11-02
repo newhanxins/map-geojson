@@ -17,6 +17,22 @@ export class GeoRenderer {
   private tooltipEl: HTMLElement | null = null;
   private currentBasemap = 'osm';
   private pendingLayers: GeoLayer[] = []; // 等待 style 加载的图层队列
+  
+  // 顶点编辑相关
+  private isEditingVertices = false;
+  private editingLayerId: string | null = null;
+  private editingFeatureIndex: number | null = null;
+  private editingFeature: GeoJSON.Feature | null = null;
+  private editingData: GeoJSON.FeatureCollection | null = null; // 当前编辑的完整数据
+  private onVertexUpdate: ((layerId: string, featureIndex: number, newGeometry: any) => void) | null = null;
+  private onVertexDelete: ((vertexIndex: number) => void) | null = null;
+  private vertexJustAdded = false; // 刚刚添加了顶点
+  // WebGL 渲染顶点
+  private hoveredVertexIndex: number | null = null;
+  private draggingVertexIndex: number | null = null;
+  private vertexCoords: number[][] = []; // 当前所有顶点坐标
+  private vertexTooltipEl: HTMLElement | null = null; // 地图上的黑色坐标浮窗
+  private onVertexHover: ((coord: number[] | null, index: number | null) => void) | null = null;
 
   constructor(container: string | HTMLElement) {
     this.map = new maplibregl.Map({
@@ -50,7 +66,7 @@ export class GeoRenderer {
     });
 
     // 添加导航控件
-    this.map.addControl(new maplibregl.NavigationControl(), 'top-right');
+    this.map.addControl(new maplibregl.NavigationControl(), 'top-left');
     this.map.addControl(new maplibregl.ScaleControl(), 'bottom-left');
 
     // 地图加载完成时重试待处理图层
@@ -75,21 +91,21 @@ export class GeoRenderer {
     this.addBasemapSwitcher();
   }
 
-  /** 添加鼠标坐标显示组件（顶部透明背景，同时显示三种坐标） */
+  /** 添加鼠标坐标显示组件（底部透明背景，同时显示三种坐标） */
   private addCoordinateDisplay(): void {
     const wrapper = document.createElement('div');
     wrapper.className = 'coord-display';
     wrapper.style.cssText = `
       position: absolute;
-      top: 8px;
+      bottom: 8px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 10;
       display: flex;
       align-items: center;
       gap: 12px;
-      background: rgba(0,0,0,0.35);
-      padding: 5px 14px;
+      background: rgba(0,0,0,0.45);
+      padding: 4px 14px;
       border-radius: 6px;
       font-size: 11px;
       font-family: Consolas, 'Courier New', monospace;
@@ -386,7 +402,7 @@ export class GeoRenderer {
     el.style.cssText = `
       position: absolute;
       top: 120px;
-      right: 10px;
+      left: 10px;
       z-index: 10;
       display: flex;
       flex-direction: column;
@@ -571,7 +587,16 @@ export class GeoRenderer {
       });
     }
 
-    const color = layer.color;
+    // 使用自定义样式或默认样式
+    const style = layer.style || {
+      fillColor: layer.color,
+      fillOpacity: 0.25,
+      strokeColor: layer.color,
+      strokeWidth: 2,
+      strokeOpacity: 0.8,
+      pointColor: layer.color,
+      pointRadius: 5,
+    };
 
     // 填充层 (面)
     if (!this.map.getLayer(this.layerFillId(layer.id))) {
@@ -581,8 +606,8 @@ export class GeoRenderer {
         source: sourceKey,
         filter: ['==', '$type', 'Polygon'],
         paint: {
-          'fill-color': color,
-          'fill-opacity': 0.25,
+          'fill-color': style.fillColor,
+          'fill-opacity': style.fillOpacity,
         },
         layout: {
           visibility: layer.visible ? 'visible' : 'none',
@@ -598,9 +623,9 @@ export class GeoRenderer {
         source: sourceKey,
         filter: ['any', ['==', '$type', 'LineString'], ['==', '$type', 'Polygon']],
         paint: {
-          'line-color': color,
-          'line-width': 2,
-          'line-opacity': 0.8,
+          'line-color': style.strokeColor,
+          'line-width': style.strokeWidth,
+          'line-opacity': style.strokeOpacity,
         },
         layout: {
           visibility: layer.visible ? 'visible' : 'none',
@@ -616,8 +641,8 @@ export class GeoRenderer {
         source: sourceKey,
         filter: ['==', '$type', 'Point'],
         paint: {
-          'circle-radius': 5,
-          'circle-color': color,
+          'circle-radius': style.pointRadius,
+          'circle-color': style.pointColor,
           'circle-stroke-width': 2,
           'circle-stroke-color': '#fff',
           'circle-opacity': 0.9,
@@ -648,28 +673,39 @@ export class GeoRenderer {
     }
   }
 
-  /** 更新图层样式 */
-  updateLayerStyle(layerId: string, style: Partial<LayerStyle>): void {
-    if (style.fillColor && this.map.getLayer(this.layerFillId(layerId))) {
-      this.map.setPaintProperty(this.layerFillId(layerId), 'fill-color', style.fillColor);
+  /** 更新图层样式（动态更新，无需重新加载数据） */
+  updateLayerStyle(layerId: string, style: Partial<import('./types').LayerStyle>): void {
+    // 更新填充层
+    if (this.map.getLayer(this.layerFillId(layerId))) {
+      if (style.fillColor !== undefined) {
+        this.map.setPaintProperty(this.layerFillId(layerId), 'fill-color', style.fillColor);
+      }
+      if (style.fillOpacity !== undefined) {
+        this.map.setPaintProperty(this.layerFillId(layerId), 'fill-opacity', style.fillOpacity);
+      }
     }
-    if (style.fillOpacity !== undefined && this.map.getLayer(this.layerFillId(layerId))) {
-      this.map.setPaintProperty(this.layerFillId(layerId), 'fill-opacity', style.fillOpacity);
+
+    // 更新描边层
+    if (this.map.getLayer(this.layerLineId(layerId))) {
+      if (style.strokeColor !== undefined) {
+        this.map.setPaintProperty(this.layerLineId(layerId), 'line-color', style.strokeColor);
+      }
+      if (style.strokeWidth !== undefined) {
+        this.map.setPaintProperty(this.layerLineId(layerId), 'line-width', style.strokeWidth);
+      }
+      if (style.strokeOpacity !== undefined) {
+        this.map.setPaintProperty(this.layerLineId(layerId), 'line-opacity', style.strokeOpacity);
+      }
     }
-    if (style.strokeColor && this.map.getLayer(this.layerLineId(layerId))) {
-      this.map.setPaintProperty(this.layerLineId(layerId), 'line-color', style.strokeColor);
-    }
-    if (style.strokeWidth !== undefined && this.map.getLayer(this.layerLineId(layerId))) {
-      this.map.setPaintProperty(this.layerLineId(layerId), 'line-width', style.strokeWidth);
-    }
-    if (style.strokeOpacity !== undefined && this.map.getLayer(this.layerLineId(layerId))) {
-      this.map.setPaintProperty(this.layerLineId(layerId), 'line-opacity', style.strokeOpacity);
-    }
-    if (style.pointColor && this.map.getLayer(this.layerPointId(layerId))) {
-      this.map.setPaintProperty(this.layerPointId(layerId), 'circle-color', style.pointColor);
-    }
-    if (style.pointRadius !== undefined && this.map.getLayer(this.layerPointId(layerId))) {
-      this.map.setPaintProperty(this.layerPointId(layerId), 'circle-radius', style.pointRadius);
+
+    // 更新点层
+    if (this.map.getLayer(this.layerPointId(layerId))) {
+      if (style.pointColor !== undefined) {
+        this.map.setPaintProperty(this.layerPointId(layerId), 'circle-color', style.pointColor);
+      }
+      if (style.pointRadius !== undefined) {
+        this.map.setPaintProperty(this.layerPointId(layerId), 'circle-radius', style.pointRadius);
+      }
     }
   }
 
@@ -775,6 +811,595 @@ export class GeoRenderer {
     if (this.map.getSource('highlight-source')) {
       this.map.removeSource('highlight-source');
     }
+  }
+
+  /** 设置编辑光标 */
+  setEditCursor(enabled: boolean): void {
+    const canvas = this.map.getCanvas();
+    if (enabled) {
+      canvas.style.cursor = 'crosshair';
+    } else {
+      canvas.style.cursor = '';
+    }
+  }
+
+  // ==================== 顶点编辑功能（WebGL 渲染） ====================
+
+  private static VERTEX_SOURCE = 'vertex-edit-source';
+  private static VERTEX_LAYER = 'vertex-edit-layer';
+  private static VERTEX_HOVER_LAYER = 'vertex-edit-hover-layer';
+
+  /** 开始编辑顶点 */
+  startVertexEditing(
+    layerId: string,
+    featureIndex: number,
+    feature: GeoJSON.Feature,
+    onUpdate: (layerId: string, featureIndex: number, newGeometry: any) => void,
+    fullData?: GeoJSON.FeatureCollection,
+    onDelete?: (vertexIndex: number) => void,
+    onHover?: (coord: number[] | null, index: number | null) => void
+  ): void {
+    this.stopVertexEditing();
+
+    this.isEditingVertices = true;
+    this.editingLayerId = layerId;
+    this.editingFeatureIndex = featureIndex;
+    this.editingFeature = JSON.parse(JSON.stringify(feature));
+    this.editingData = fullData ? JSON.parse(JSON.stringify(fullData)) : null;
+    this.onVertexUpdate = onUpdate;
+    this.onVertexDelete = onDelete || null;
+    this.onVertexHover = onHover || null;
+
+    // 添加顶点 source + layer
+    this.addVertexLayers();
+    this.refreshVertexDisplay();
+
+    // 创建坐标浮窗
+    this.createVertexTooltip();
+
+    // 绑定地图级事件
+    this.map.on('mousemove', this.onVertexMouseMove);
+    this.map.on('mousedown', this.onVertexMouseDown);
+    this.map.on('mouseup', this.onVertexMouseUp);
+    this.map.on('click', this.handleMapClickForAddVertex);
+    this.map.on('contextmenu', this.onVertexContextMenu);
+  }
+
+  /** 停止编辑顶点 */
+  stopVertexEditing(): void {
+    this.removeVertexLayers();
+    this.removeVertexTooltip();
+
+    this.isEditingVertices = false;
+    this.editingLayerId = null;
+    this.editingFeatureIndex = null;
+    this.editingFeature = null;
+    this.editingData = null;
+    this.onVertexUpdate = null;
+    this.onVertexDelete = null;
+    this.onVertexHover = null;
+    this.hoveredVertexIndex = null;
+    this.draggingVertexIndex = null;
+    this.vertexCoords = [];
+
+    // 移除地图事件
+    this.map.off('mousemove', this.onVertexMouseMove);
+    this.map.off('mousedown', this.onVertexMouseDown);
+    this.map.off('mouseup', this.onVertexMouseUp);
+    this.map.off('click', this.handleMapClickForAddVertex);
+    this.map.off('contextmenu', this.onVertexContextMenu);
+  }
+
+  /** 添加顶点 WebGL 图层 */
+  private addVertexLayers(): void {
+    if (!this.map.getSource(GeoRenderer.VERTEX_SOURCE)) {
+      this.map.addSource(GeoRenderer.VERTEX_SOURCE, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+    }
+
+    if (!this.map.getLayer(GeoRenderer.VERTEX_LAYER)) {
+      this.map.addLayer({
+        id: GeoRenderer.VERTEX_LAYER,
+        type: 'circle',
+        source: GeoRenderer.VERTEX_SOURCE,
+        paint: {
+          'circle-radius': 6,
+          'circle-color': '#4f8cff',
+          'circle-stroke-width': 2.5,
+          'circle-stroke-color': '#ffffff',
+        },
+      });
+    }
+
+    // 悬停高亮层（单点显示）
+    if (!this.map.getLayer(GeoRenderer.VERTEX_HOVER_LAYER)) {
+      this.map.addLayer({
+        id: GeoRenderer.VERTEX_HOVER_LAYER,
+        type: 'circle',
+        source: GeoRenderer.VERTEX_SOURCE,
+        filter: ['==', ['get', 'index'], -1], // 默认不显示
+        paint: {
+          'circle-radius': 9,
+          'circle-color': '#ff6b6b',
+          'circle-stroke-width': 3,
+          'circle-stroke-color': '#ffffff',
+        },
+      });
+    }
+  }
+
+  /** 移除顶点图层 */
+  private removeVertexLayers(): void {
+    for (const id of [GeoRenderer.VERTEX_HOVER_LAYER, GeoRenderer.VERTEX_LAYER]) {
+      if (this.map.getLayer(id)) this.map.removeLayer(id);
+    }
+    if (this.map.getSource(GeoRenderer.VERTEX_SOURCE)) {
+      this.map.removeSource(GeoRenderer.VERTEX_SOURCE);
+    }
+  }
+
+  /** 刷新顶点显示 */
+  private refreshVertexDisplay(): void {
+    if (!this.editingFeature) return;
+
+    this.vertexCoords = this.extractCoords(this.editingFeature.geometry);
+    const features: GeoJSON.Feature[] = this.vertexCoords.map((coord, i) => ({
+      type: 'Feature' as const,
+      properties: { index: i },
+      geometry: { type: 'Point' as const, coordinates: coord },
+    }));
+
+    const source = this.map.getSource(GeoRenderer.VERTEX_SOURCE) as maplibregl.GeoJSONSource;
+    if (source) {
+      source.setData({ type: 'FeatureCollection', features });
+    }
+  }
+
+  /** 创建坐标浮窗 */
+  private createVertexTooltip(): void {
+    this.removeVertexTooltip();
+    const el = document.createElement('div');
+    el.className = 'vertex-coord-tooltip';
+    el.style.cssText = `
+      position: absolute;
+      display: none;
+      pointer-events: none;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      font-size: 12px;
+      font-family: Consolas, monospace;
+      padding: 5px 10px;
+      border-radius: 4px;
+      white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    `;
+    this.map.getContainer().appendChild(el);
+    this.vertexTooltipEl = el;
+  }
+
+  /** 移除坐标浮窗 */
+  private removeVertexTooltip(): void {
+    if (this.vertexTooltipEl) {
+      this.vertexTooltipEl.remove();
+      this.vertexTooltipEl = null;
+    }
+  }
+
+  /** 更新浮窗显示（鼠标位置 + 坐标） */
+  private showVertexTooltip(mouseX: number, mouseY: number, coord: number[]): void {
+    if (!this.vertexTooltipEl) return;
+    this.vertexTooltipEl.style.display = 'block';
+    this.vertexTooltipEl.textContent = `${coord[0].toFixed(6)}, ${coord[1].toFixed(6)}`;
+    // 鼠标右侧偏移
+    this.vertexTooltipEl.style.left = `${mouseX + 14}px`;
+    this.vertexTooltipEl.style.top = `${mouseY - 12}px`;
+  }
+
+  /** 隐藏顶点浮窗 */
+  private hideVertexTooltip(): void {
+    if (this.vertexTooltipEl) {
+      this.vertexTooltipEl.style.display = 'none';
+    }
+  }
+
+  /** 获取鼠标下的顶点索引（使用 BBOX 查询提高容错） */
+  private queryVertexAtPoint(point: maplibregl.PointLike): number | null {
+    // 使用 10x10 像素的包围盒查询，提高点击容错
+    const px = (point as any).x ?? (point as number[])[0];
+    const py = (point as any).y ?? (point as number[])[1];
+    const bbox: [maplibregl.PointLike, maplibregl.PointLike] = [
+      [px - 8, py - 8],
+      [px + 8, py + 8],
+    ];
+    const features = this.map.queryRenderedFeatures(bbox, {
+      layers: [GeoRenderer.VERTEX_LAYER],
+    });
+    if (features.length > 0 && features[0].properties) {
+      return features[0].properties.index as number;
+    }
+    return null;
+  }
+
+  /** 更新悬停高亮 */
+  private updateHoverHighlight(vertexIndex: number | null, mouseX?: number, mouseY?: number): void {
+    const prevIndex = this.hoveredVertexIndex;
+    this.hoveredVertexIndex = vertexIndex;
+
+    // 更新高亮层 filter
+    if (vertexIndex !== prevIndex) {
+      if (this.map.getLayer(GeoRenderer.VERTEX_HOVER_LAYER)) {
+        if (vertexIndex !== null) {
+          this.map.setFilter(GeoRenderer.VERTEX_HOVER_LAYER, ['==', ['get', 'index'], vertexIndex]);
+        } else {
+          this.map.setFilter(GeoRenderer.VERTEX_HOVER_LAYER, ['==', ['get', 'index'], -1]);
+        }
+      }
+    }
+
+    // 更新光标
+    const canvas = this.map.getCanvas();
+    canvas.style.cursor = vertexIndex !== null ? 'move' : (this.isEditingVertices ? 'crosshair' : '');
+
+    // 显示/隐藏坐标浮窗
+    if (vertexIndex !== null && this.vertexCoords[vertexIndex] && mouseX !== undefined && mouseY !== undefined) {
+      this.showVertexTooltip(mouseX, mouseY, this.vertexCoords[vertexIndex]);
+    } else if (this.draggingVertexIndex === null) {
+      this.hideVertexTooltip();
+    }
+
+    // 通知回调
+    if (this.onVertexHover) {
+      if (vertexIndex !== null && this.vertexCoords[vertexIndex]) {
+        this.onVertexHover(this.vertexCoords[vertexIndex], vertexIndex);
+      } else if (this.draggingVertexIndex === null) {
+        this.onVertexHover(null, null);
+      }
+    }
+  }
+
+
+
+  // ---------- 地图级事件处理 ----------
+
+  private onVertexMouseMove = (e: maplibregl.MapMouseEvent): void => {
+    if (!this.isEditingVertices) return;
+
+    // 拖动中
+    if (this.draggingVertexIndex !== null) {
+      const newCoord = [e.lngLat.lng, e.lngLat.lat];
+      this.updateVertexGeometry(this.draggingVertexIndex, newCoord);
+      this.vertexCoords[this.draggingVertexIndex] = newCoord;
+
+      // 更新 source（流畅拖动）
+      if (this.editingLayerId && this.editingFeatureIndex !== null && this.editingFeature) {
+        this.updateLayerSource(this.editingLayerId, this.editingFeatureIndex, this.editingFeature);
+      }
+
+      // 更新顶点显示
+      this.refreshVertexDisplay();
+
+      // 更新浮窗位置和内容
+      this.showVertexTooltip(e.point.x, e.point.y, newCoord);
+
+      // 通知回调（实时更新坐标）
+      if (this.onVertexHover) {
+        this.onVertexHover(newCoord, this.draggingVertexIndex);
+      }
+      return;
+    }
+
+    // 悬停检测
+    const vertexIdx = this.queryVertexAtPoint(e.point);
+    this.updateHoverHighlight(vertexIdx, e.point.x, e.point.y);
+  };
+
+  private onVertexMouseDown = (e: maplibregl.MapMouseEvent): void => {
+    if (!this.isEditingVertices) return;
+
+    const vertexIdx = this.queryVertexAtPoint(e.point);
+    if (vertexIdx !== null) {
+      e.preventDefault();
+      this.draggingVertexIndex = vertexIdx;
+      this.map.dragPan.disable();
+      this.map.getCanvas().style.cursor = 'grabbing';
+    }
+  };
+
+  private onVertexMouseUp = (_e: maplibregl.MapMouseEvent): void => {
+    if (this.draggingVertexIndex !== null) {
+      const idx = this.draggingVertexIndex;
+      this.draggingVertexIndex = null;
+      this.map.dragPan.enable();
+      this.map.getCanvas().style.cursor = 'move';
+
+      // 记录历史
+      this.handleVertexDrag(idx, this.vertexCoords[idx]);
+
+      // 标记刚拖动完，防止触发空白区域点击
+      this.vertexJustAdded = true;
+      setTimeout(() => { this.vertexJustAdded = false; }, 150);
+    }
+  };
+
+  private onVertexContextMenu = (e: maplibregl.MapMouseEvent): void => {
+    if (!this.isEditingVertices) return;
+
+    const vertexIdx = this.queryVertexAtPoint(e.point);
+    if (vertexIdx !== null) {
+      // 阻止浏览器默认右键菜单
+      e.originalEvent.preventDefault();
+      if (this.onVertexDelete) {
+        this.onVertexDelete(vertexIdx);
+      }
+    }
+  };
+
+  /** 地图点击添加顶点 */
+  private handleMapClickForAddVertex = (e: maplibregl.MapMouseEvent): void => {
+    if (!this.isEditingVertices || !this.editingFeature || !this.editingLayerId || this.editingFeatureIndex === null) {
+      return;
+    }
+
+    const clickCoord = [e.lngLat.lng, e.lngLat.lat];
+    const geometry = this.editingFeature.geometry;
+
+    if (geometry.type === 'Polygon' || geometry.type === 'MultiPolygon' ||
+        geometry.type === 'LineString' || geometry.type === 'MultiLineString') {
+
+      const result = this.insertVertexOnNearestEdge(geometry, clickCoord);
+      if (result) {
+        this.vertexJustAdded = true;
+        setTimeout(() => { this.vertexJustAdded = false; }, 150);
+
+        this.editingFeature.geometry = result.geometry;
+        this.updateLayerSource(this.editingLayerId, this.editingFeatureIndex, this.editingFeature);
+        this.refreshVertexDisplay();
+
+        if (this.onVertexUpdate) {
+          this.onVertexUpdate(this.editingLayerId, this.editingFeatureIndex, this.editingFeature.geometry);
+        }
+      }
+    }
+  };
+
+  /** 在最近的边上插入顶点 */
+  private insertVertexOnNearestEdge(geometry: any, clickCoord: number[]): { geometry: any; insertIndex: number } | null {
+    let minDist = Infinity;
+    let bestRing: number[][] | null = null;
+    let bestInsertIndex = -1;
+
+    const rings = this.getRings(geometry);
+    
+    for (const ring of rings) {
+      for (let i = 0; i < ring.length - 1; i++) {
+        const p1 = ring[i];
+        const p2 = ring[i + 1];
+        const dist = this.pointToSegmentDistance(clickCoord, p1, p2);
+        if (dist < minDist) {
+          minDist = dist;
+          bestRing = ring;
+          bestInsertIndex = i + 1;
+        }
+      }
+    }
+
+    if (bestRing && minDist < 0.1) { // 距离阈值（度）
+      // 在边上插入新点
+      const newPoint = this.projectPointOnSegment(clickCoord, bestRing[bestInsertIndex - 1], bestRing[bestInsertIndex]);
+      bestRing.splice(bestInsertIndex, 0, newPoint);
+      return { geometry, insertIndex: bestInsertIndex };
+    }
+
+    return null;
+  }
+
+  /** 获取几何体的所有环 */
+  private getRings(geometry: any): number[][][] {
+    if (geometry.type === 'Polygon') {
+      return geometry.coordinates;
+    } else if (geometry.type === 'MultiPolygon') {
+      return geometry.coordinates.flat();
+    } else if (geometry.type === 'LineString') {
+      return [geometry.coordinates];
+    } else if (geometry.type === 'MultiLineString') {
+      return geometry.coordinates;
+    }
+    return [];
+  }
+
+  /** 点到线段的距离 */
+  private pointToSegmentDistance(p: number[], a: number[], b: number[]): number {
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const len2 = dx * dx + dy * dy;
+    if (len2 === 0) return Math.hypot(p[0] - a[0], p[1] - a[1]);
+    let t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    const projX = a[0] + t * dx;
+    const projY = a[1] + t * dy;
+    return Math.hypot(p[0] - projX, p[1] - projY);
+  }
+
+  /** 投影点到线段上 */
+  private projectPointOnSegment(p: number[], a: number[], b: number[]): number[] {
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const len2 = dx * dx + dy * dy;
+    if (len2 === 0) return [...a];
+    let t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    return [a[0] + t * dx, a[1] + t * dy];
+  }
+
+  /** 实时更新图层 source（不删除/重建图层） */
+  private updateLayerSource(layerId: string, featureIndex: number, updatedFeature: GeoJSON.Feature): void {
+    const sourceKey = this.sourceId(layerId);
+    const source = this.map.getSource(sourceKey) as maplibregl.GeoJSONSource;
+    if (!source || !this.editingData) return;
+
+    // 更新编辑数据中的要素
+    this.editingData.features[featureIndex] = updatedFeature;
+    // 触发 source 更新（MapLibre 会自动重新渲染）
+    source.setData(this.editingData);
+  }
+
+  /** 更新顶点几何（拖动过程中，不记录历史） */
+  private updateVertexGeometry(vertexIndex: number, newCoord: number[]): void {
+    if (!this.editingFeature) return;
+
+    const geometry = this.editingFeature.geometry;
+    let coordIndex = 0;
+    
+    if (geometry.type === 'Point') {
+      geometry.coordinates = newCoord;
+    } else if (geometry.type === 'LineString' || geometry.type === 'MultiPoint') {
+      geometry.coordinates[vertexIndex] = newCoord;
+    } else if (geometry.type === 'Polygon' || geometry.type === 'MultiLineString') {
+      for (let ringIdx = 0; ringIdx < geometry.coordinates.length; ringIdx++) {
+        const ring = geometry.coordinates[ringIdx];
+        if (vertexIndex >= coordIndex && vertexIndex < coordIndex + ring.length) {
+          ring[vertexIndex - coordIndex] = newCoord;
+          break;
+        }
+        coordIndex += ring.length;
+      }
+    } else if (geometry.type === 'MultiPolygon') {
+      for (let polyIdx = 0; polyIdx < geometry.coordinates.length; polyIdx++) {
+        const polygon = geometry.coordinates[polyIdx];
+        for (let ringIdx = 0; ringIdx < polygon.length; ringIdx++) {
+          const ring = polygon[ringIdx];
+          if (vertexIndex >= coordIndex && vertexIndex < coordIndex + ring.length) {
+            ring[vertexIndex - coordIndex] = newCoord;
+            break;
+          }
+          coordIndex += ring.length;
+        }
+      }
+    }
+  }
+
+  /** 提取所有坐标 */
+  private extractCoords(geometry: any): number[][] {
+    const coords: number[][] = [];
+    
+    if (geometry.type === 'Point') {
+      coords.push(geometry.coordinates);
+    } else if (geometry.type === 'LineString' || geometry.type === 'MultiPoint') {
+      coords.push(...geometry.coordinates);
+    } else if (geometry.type === 'Polygon' || geometry.type === 'MultiLineString') {
+      for (const ring of geometry.coordinates) {
+        coords.push(...ring);
+      }
+    } else if (geometry.type === 'MultiPolygon') {
+      for (const polygon of geometry.coordinates) {
+        for (const ring of polygon) {
+          coords.push(...ring);
+        }
+      }
+    }
+    
+    return coords;
+  }
+
+  /** 处理顶点拖动结束（记录历史） */
+  private handleVertexDrag(vertexIndex: number, newCoord: number[]): void {
+    if (!this.editingLayerId || this.editingFeatureIndex === null || !this.onVertexUpdate || !this.editingFeature) {
+      return;
+    }
+
+    // 通知调用者（会记录到编辑历史）
+    this.onVertexUpdate(this.editingLayerId, this.editingFeatureIndex, this.editingFeature.geometry);
+  }
+
+  /** 删除顶点 */
+  removeVertex(vertexIndex: number): boolean {
+    if (!this.editingFeature) return false;
+
+    const geometry = this.editingFeature.geometry;
+    let coordIndex = 0;
+
+    // 检查是否可以删除（至少需要保留最小顶点数）
+    if (geometry.type === 'Polygon') {
+      // 多边形至少需要 3 个顶点（加上闭合点共 4 个坐标）
+      const totalCoords = geometry.coordinates.reduce((sum: number, ring: number[][]) => sum + ring.length, 0);
+      if (totalCoords <= 4) {
+        return false; // 不能删除，否则不是有效多边形
+      }
+    } else if (geometry.type === 'MultiPolygon') {
+      const totalCoords = geometry.coordinates.reduce((sum: number, poly: number[][][]) => 
+        sum + poly.reduce((s: number, ring: number[][]) => s + ring.length, 0), 0);
+      if (totalCoords <= 4) {
+        return false;
+      }
+    } else if (geometry.type === 'LineString') {
+      if (geometry.coordinates.length <= 2) {
+        return false; // 线至少需要 2 个点
+      }
+    } else if (geometry.type === 'Point' || geometry.type === 'MultiPoint') {
+      return false; // 点类型不支持删除顶点
+    }
+
+    // 删除顶点
+    if (geometry.type === 'LineString' || geometry.type === 'MultiPoint') {
+      geometry.coordinates.splice(vertexIndex, 1);
+    } else if (geometry.type === 'Polygon' || geometry.type === 'MultiLineString') {
+      for (const ring of geometry.coordinates) {
+        if (vertexIndex >= coordIndex && vertexIndex < coordIndex + ring.length) {
+          ring.splice(vertexIndex - coordIndex, 1);
+          // 如果是多边形的环，删除后要更新闭合点
+          if (geometry.type === 'Polygon' && ring.length > 0) {
+            ring[ring.length - 1] = ring[0];
+          }
+          break;
+        }
+        coordIndex += ring.length;
+      }
+    } else if (geometry.type === 'MultiPolygon') {
+      for (const polygon of geometry.coordinates) {
+        for (const ring of polygon) {
+          if (vertexIndex >= coordIndex && vertexIndex < coordIndex + ring.length) {
+            ring.splice(vertexIndex - coordIndex, 1);
+            // 更新闭合点
+            if (ring.length > 0) {
+              ring[ring.length - 1] = ring[0];
+            }
+            break;
+          }
+          coordIndex += ring.length;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  /** 获取编辑状态 */
+  getEditingState(): { isEditing: boolean; layerId: string | null; featureIndex: number | null } {
+    return {
+      isEditing: this.isEditingVertices,
+      layerId: this.editingLayerId,
+      featureIndex: this.editingFeatureIndex,
+    };
+  }
+
+  /** 获取当前编辑的要素 */
+  getEditingFeature(): GeoJSON.Feature | null {
+    return this.editingFeature;
+  }
+
+  /** 获取当前编辑的数据集 */
+  getEditingData(): GeoJSON.FeatureCollection | null {
+    return this.editingData;
+  }
+
+  /** 检查并重置刚刚添加顶点标志 */
+  consumeVertexAddedFlag(): boolean {
+    const flag = this.vertexJustAdded;
+    this.vertexJustAdded = false;
+    return flag;
   }
 
   /** 查询地图上的要素（使用 bbox 查询 + 面积优先排序） */

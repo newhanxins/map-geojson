@@ -63,14 +63,8 @@ html, body {
 }
 
 .panel-layers {
-  flex: 0 0 auto;
-  max-height: 45%;
-}
-
-.panel-properties {
   flex: 1;
   min-height: 0;
-  border-top: 1px solid var(--border-light);
 }
 
 .panel-section-header {
@@ -131,40 +125,83 @@ html, body {
   align-items: center;
   justify-content: center;
   gap: var(--space-xs);
-  padding: 6px 12px;
+  padding: 8px 14px;
   border: 1px solid var(--border-medium);
   border-radius: var(--radius-md);
   background: var(--bg-surface);
   color: var(--text-primary);
   font-size: var(--font-size-sm);
   font-family: var(--font-family);
+  font-weight: 500;
   cursor: pointer;
   transition: all var(--transition-fast);
   white-space: nowrap;
   user-select: none;
   flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-.btn:hover {
+.btn:hover:not(:disabled) {
   background: var(--bg-hover);
   border-color: var(--color-primary);
   color: var(--color-primary);
+  box-shadow: 0 2px 6px rgba(79, 140, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 .btn-primary {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
+  background: linear-gradient(135deg, #4f8cff 0%, #667eea 100%);
+  border-color: transparent;
+  color: var(--text-inverse);
+  font-weight: 600;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #3a7be0 0%, #5568d9 100%);
+  border-color: transparent;
+  color: var(--text-inverse);
+  box-shadow: 0 4px 12px rgba(79, 140, 255, 0.4);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border-color: transparent;
   color: var(--text-inverse);
 }
 
-.btn-primary:hover {
-  background: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
+.btn-success:hover:not(:disabled) {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  border-color: transparent;
   color: var(--text-inverse);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  border-color: transparent;
+  color: var(--text-inverse);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  border-color: transparent;
+  color: var(--text-inverse);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
 }
 
 .btn-sm {
-  padding: 3px 8px;
+  padding: 4px 10px;
   font-size: var(--font-size-xs);
 }
 

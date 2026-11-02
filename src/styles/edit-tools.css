@@ -1,0 +1,14 @@
+/* 编辑工具组样式（已迁移到 toolbar.css） */
+/* 确认对话框样式 */
+.modal h3 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.modal p {
+  margin: 0 0 20px 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}

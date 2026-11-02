@@ -4,9 +4,9 @@
   align-items: center;
   height: var(--toolbar-height);
   padding: 0 var(--space-lg);
-  background: var(--bg-surface);
+  background: linear-gradient(to bottom, #ffffff 0%, #f8f9fa 100%);
   border-bottom: 1px solid var(--border-light);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   gap: var(--space-md);
   z-index: 100;
   overflow: visible;
@@ -20,14 +20,18 @@
 }
 
 .toolbar-brand .logo {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
+  filter: drop-shadow(0 2px 4px rgba(79, 140, 255, 0.3));
 }
 
 .toolbar-brand h1 {
   font-size: var(--font-size-lg);
   font-weight: 700;
-  color: var(--text-primary);
+  background: linear-gradient(135deg, #4f8cff 0%, #667eea 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   white-space: nowrap;
 }
 
@@ -183,4 +187,142 @@
   background: var(--color-primary);
   border-color: var(--color-primary);
   color: var(--text-inverse);
+}
+
+/* 编辑工具组样式 */
+.toolbar-group.edit-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 编辑模式切换按钮 */
+.btn-edit-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-edit-toggle:hover {
+  background: var(--bg-hover);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.btn-edit-toggle.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: white;
+}
+
+.btn-edit-toggle.active:hover {
+  background: #3a7be0;
+}
+
+/* 图标按钮 */
+.btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  color: var(--text-primary);
+}
+
+.btn-icon:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.btn-icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-icon.btn-danger-icon:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+/* 导出弹窗样式 */
+.export-modal {
+  width: 400px;
+  max-width: 90vw;
+}
+
+.export-modal h2 {
+  margin-bottom: var(--space-lg);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.export-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+}
+
+.export-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.export-option:hover {
+  background: var(--bg-hover);
+  border-color: var(--color-primary);
+  transform: translateX(4px);
+  box-shadow: 0 2px 8px rgba(79, 140, 255, 0.15);
+}
+
+.export-option-icon {
+  font-size: 24px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+
+.export-option-content {
+  flex: 1;
+}
+
+.export-option-title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.export-option-desc {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
 }

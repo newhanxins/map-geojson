@@ -19,6 +19,30 @@
       <!-- 地图（左侧） -->
       <div class="map-container">
         <div id="map"></div>
+
+        <!-- 右侧编辑工具栏 -->
+        <div class="map-edit-toolbar" id="mapEditToolbar">
+          <button class="map-tool-btn" id="btnEditMode" title="编辑模式（需先选中图层）">
+            <span>&#9998;</span>
+            <span class="tool-label">编辑</span>
+          </button>
+          <button class="map-tool-btn" id="btnSaveEdit" title="保存 (Ctrl+S)" disabled>
+            <span>&#128190;</span>
+            <span class="tool-label">保存</span>
+          </button>
+          <button class="map-tool-btn" id="btnUndo" title="撤销 (Ctrl+Z)" disabled>
+            <span>&#8634;</span>
+            <span class="tool-label">撤销</span>
+          </button>
+          <button class="map-tool-btn" id="btnRedo" title="重做 (Ctrl+Y)" disabled>
+            <span>&#8635;</span>
+            <span class="tool-label">重做</span>
+          </button>
+          <button class="map-tool-btn btn-danger" id="btnDeleteSelected" title="删除选中 (Delete)" disabled>
+            <span>&#128465;</span>
+            <span class="tool-label">删除</span>
+          </button>
+        </div>
       </div>
 
       <!-- 右侧操作面板 -->
@@ -30,18 +54,6 @@
             <span class="panel-count" id="layerCount">0</span>
           </div>
           <div class="panel-section-body" id="sidebar"></div>
-        </div>
-
-        <!-- 要素属性区域 -->
-        <div class="panel-section panel-properties">
-          <div class="panel-section-header">
-            <span>要素属性</span>
-          </div>
-          <div class="panel-section-body" id="propertiesContent">
-            <div class="empty-state">
-              <p>点击地图上的要素查看属性信息</p>
-            </div>
-          </div>
         </div>
       </div>
     </div>
