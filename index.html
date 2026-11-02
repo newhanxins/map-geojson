@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GeoJSON 查看器</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- 工具栏 -->
+    <div class="toolbar" id="toolbar"></div>
+
+    <!-- 简化控制栏 (默认隐藏) -->
+    <div class="simplify-bar" id="simplifyBar" style="display:none;"></div>
+
+    <!-- 主体：左地图 + 右面板 -->
+    <div class="app-body">
+      <!-- 地图（左侧） -->
+      <div class="map-container">
+        <div id="map"></div>
+      </div>
+
+      <!-- 右侧操作面板 -->
+      <div class="right-panel" id="rightPanel">
+        <!-- 图层区域 -->
+        <div class="panel-section panel-layers">
+          <div class="panel-section-header">
+            <span>图层</span>
+            <span class="panel-count" id="layerCount">0</span>
+          </div>
+          <div class="panel-section-body" id="sidebar"></div>
+        </div>
+
+        <!-- 要素属性区域 -->
+        <div class="panel-section panel-properties">
+          <div class="panel-section-header">
+            <span>要素属性</span>
+          </div>
+          <div class="panel-section-body" id="propertiesContent">
+            <div class="empty-state">
+              <p>点击地图上的要素查看属性信息</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 拖拽提示覆盖层 -->
+    <div class="drop-overlay" id="dropOverlay" style="display:none;">
+      <div class="drop-overlay-content">
+        <span class="drop-icon">&#128194;</span>
+        <p>将 GeoJSON 文件拖到此处</p>
+      </div>
+    </div>
+
+    <!-- 隐藏文件输入 -->
+    <input type="file" id="fileInput" class="file-input-hidden" accept=".geojson,.json,.topojson" multiple />
+  </div>
+
+  <script type="module" src="/src/web/main.ts"></script>
+</body>
+</html>

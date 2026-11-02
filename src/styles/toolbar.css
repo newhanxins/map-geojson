@@ -1,0 +1,186 @@
+/* 工具栏样式 */
+.toolbar {
+  display: flex;
+  align-items: center;
+  height: var(--toolbar-height);
+  padding: 0 var(--space-lg);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
+  gap: var(--space-md);
+  z-index: 100;
+  overflow: visible;
+}
+
+.toolbar-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-right: auto;
+}
+
+.toolbar-brand .logo {
+  width: 24px;
+  height: 24px;
+}
+
+.toolbar-brand h1 {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-light);
+}
+
+/* 下拉菜单 */
+.dropdown {
+  position: relative;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 160px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-xs) 0;
+  z-index: 1000;
+  display: none;
+}
+
+.dropdown-menu.show {
+  display: block;
+}
+
+.dropdown-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.dropdown-menu-item:hover {
+  background: var(--bg-hover);
+}
+
+.dropdown-menu-item .item-icon {
+  width: 16px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.dropdown-menu-divider {
+  height: 1px;
+  background: var(--border-light);
+  margin: var(--space-xs) 0;
+}
+
+/* URL 输入弹窗 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.modal {
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-xl);
+  min-width: 400px;
+  max-width: 500px;
+}
+
+.modal h2 {
+  font-size: var(--font-size-lg);
+  margin-bottom: var(--space-lg);
+  color: var(--text-primary);
+}
+
+.modal .input {
+  width: 100%;
+  margin-bottom: var(--space-lg);
+}
+
+.modal .modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+/* 简化工具栏 */
+.simplify-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.simplify-bar label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.simplify-bar input[type="range"] {
+  flex: 1;
+  max-width: 200px;
+}
+
+.simplify-bar .simplify-value {
+  font-size: var(--font-size-sm);
+  font-family: var(--font-mono);
+  color: var(--color-primary);
+  min-width: 40px;
+}
+
+.simplify-bar .simplify-algo {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.simplify-bar .simplify-algo button {
+  padding: 3px 8px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.simplify-bar .simplify-algo button.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--text-inverse);
+}
