@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import { resolve } from 'path';
 import fs from 'fs';
 
@@ -12,13 +12,21 @@ import fs from 'fs';
  * - extension-dev:  Chrome Extension 开发构建 → dist-ext/ (不压缩, 带 sourcemap)
  */
 export default defineConfig(({ mode }) => {
+  // 加载环境变量（必须在 defineConfig 内部调用）
+  const env = loadEnv(mode, process.cwd());
+  
   const isExtension = mode === 'extension' || mode === 'extension-dev';
   const isDev = mode === 'development' || mode === 'extension-dev';
 
-  // 下钻功能开关：扩展模式默认关闭（不含 geo 数据），其他模式开启
+  // 下钻功能开关
+  // - 扩展模式：默认关闭（geo 数据 100-200MB，包体太大）
+  // - 其他模式：默认开启
+  // - 可通过 .env 文件 VITE_ENABLE_DRILL_DOWN 覆盖
   const enableDrillDown = isExtension
-    ? process.env.VITE_ENABLE_DRILL_DOWN === 'true'
-    : process.env.VITE_ENABLE_DRILL_DOWN !== 'false';
+    ? env.VITE_ENABLE_DRILL_DOWN === 'true'   // 扩展：需显式启用
+    : env.VITE_ENABLE_DRILL_DOWN !== 'false'; // 其他：默认启用
+  
+  console.log('[vite.config] mode:', mode, 'VITE_ENABLE_DRILL_DOWN:', env.VITE_ENABLE_DRILL_DOWN, '→ enableDrillDown:', enableDrillDown);
 
   // Extension 模式下的构建入口
   const extensionInput: Record<string, string> = {
@@ -34,6 +42,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     define: {
+      // 注入到 src/core/app.ts 中
       __ENABLE_DRILL_DOWN__: JSON.stringify(enableDrillDown),
     },
     build: {
@@ -69,6 +78,7 @@ export default defineConfig(({ mode }) => {
     // 开发服务器始终为 Web 模式
     server: {
       port: 5173,
+      strictPort: true,  // 端口被占用时直接报错，不自动切换
       open: true,
       host: true,
     },

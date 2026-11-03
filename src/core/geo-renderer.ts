@@ -24,7 +24,7 @@ export class GeoRenderer {
   private editingFeatureIndex: number | null = null;
   private editingFeature: GeoJSON.Feature | null = null;
   private editingData: GeoJSON.FeatureCollection | null = null; // 当前编辑的完整数据
-  private onVertexUpdate: ((layerId: string, featureIndex: number, newGeometry: any) => void) | null = null;
+  private onVertexUpdate: ((layerId: string, featureIndex: number, oldGeometry: any, newGeometry: any) => void) | null = null;
   private onVertexDelete: ((vertexIndex: number) => void) | null = null;
   private vertexJustAdded = false; // 刚刚添加了顶点
   // WebGL 渲染顶点
@@ -33,6 +33,8 @@ export class GeoRenderer {
   private vertexCoords: number[][] = []; // 当前所有顶点坐标
   private vertexTooltipEl: HTMLElement | null = null; // 地图上的黑色坐标浮窗
   private onVertexHover: ((coord: number[] | null, index: number | null) => void) | null = null;
+  private preDragGeometry: any = null; // 拖动前的几何数据（用于历史记录）
+  private mouseMoveCount = 0; // 调试用：mousemove 事件计数
 
   constructor(container: string | HTMLElement) {
     this.map = new maplibregl.Map({
@@ -834,7 +836,7 @@ export class GeoRenderer {
     layerId: string,
     featureIndex: number,
     feature: GeoJSON.Feature,
-    onUpdate: (layerId: string, featureIndex: number, newGeometry: any) => void,
+    onUpdate: (layerId: string, featureIndex: number, oldGeometry: any, newGeometry: any) => void,
     fullData?: GeoJSON.FeatureCollection,
     onDelete?: (vertexIndex: number) => void,
     onHover?: (coord: number[] | null, index: number | null) => void
@@ -858,11 +860,13 @@ export class GeoRenderer {
     this.createVertexTooltip();
 
     // 绑定地图级事件
+    console.log('[startVertexEditing] 绑定事件处理器');
     this.map.on('mousemove', this.onVertexMouseMove);
     this.map.on('mousedown', this.onVertexMouseDown);
     this.map.on('mouseup', this.onVertexMouseUp);
     this.map.on('click', this.handleMapClickForAddVertex);
     this.map.on('contextmenu', this.onVertexContextMenu);
+    console.log('[startVertexEditing] contextmenu 事件已绑定');
   }
 
   /** 停止编辑顶点 */
@@ -1067,6 +1071,13 @@ export class GeoRenderer {
   private onVertexMouseMove = (e: maplibregl.MapMouseEvent): void => {
     if (!this.isEditingVertices) return;
 
+    // 调试日志（每100次mousemove打印一次，避免刷屏）
+    if (!this.mouseMoveCount) this.mouseMoveCount = 0;
+    this.mouseMoveCount++;
+    if (this.mouseMoveCount % 100 === 1) {
+      console.log('[onVertexMouseMove] 事件触发，editing enabled:', this.isEditingVertices);
+    }
+
     // 拖动中
     if (this.draggingVertexIndex !== null) {
       const newCoord = [e.lngLat.lng, e.lngLat.lat];
@@ -1105,6 +1116,11 @@ export class GeoRenderer {
       this.draggingVertexIndex = vertexIdx;
       this.map.dragPan.disable();
       this.map.getCanvas().style.cursor = 'grabbing';
+      
+      // 保存拖动前的几何（用于历史记录）
+      if (this.editingFeature) {
+        this.preDragGeometry = JSON.parse(JSON.stringify(this.editingFeature.geometry));
+      }
     }
   };
 
@@ -1125,17 +1141,100 @@ export class GeoRenderer {
   };
 
   private onVertexContextMenu = (e: maplibregl.MapMouseEvent): void => {
-    if (!this.isEditingVertices) return;
+    if (!this.isEditingVertices) {
+      console.log('[onVertexContextMenu] not editing vertices');
+      return;
+    }
 
+    console.log('[onVertexContextMenu] checking vertex at point', e.point);
     const vertexIdx = this.queryVertexAtPoint(e.point);
+    console.log('[onVertexContextMenu] vertex index:', vertexIdx);
+    
     if (vertexIdx !== null) {
       // 阻止浏览器默认右键菜单
       e.originalEvent.preventDefault();
+      
+      // 显示顶点操作菜单
+      console.log('[onVertexContextMenu] showing menu');
+      this.showVertexContextMenu(e.originalEvent.clientX, e.originalEvent.clientY, vertexIdx);
+    }
+  };
+
+  /** 显示顶点右键菜单 */
+  private showVertexContextMenu(x: number, y: number, vertexIdx: number): void {
+    // 移除已有菜单
+    const existingMenu = document.querySelector('.vertex-context-menu');
+    if (existingMenu) existingMenu.remove();
+
+    const menu = document.createElement('div');
+    menu.className = 'vertex-context-menu';
+    menu.style.cssText = `
+      position: fixed;
+      left: ${x}px;
+      top: ${y}px;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      padding: 4px 0;
+      z-index: 10001;
+      min-width: 140px;
+      font-size: 13px;
+    `;
+    menu.innerHTML = `
+      <div class="vertex-menu-item" data-action="delete" style="padding: 8px 16px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+        <span>🗑️</span>
+        <span>删除顶点</span>
+      </div>
+      <div class="vertex-menu-item" data-action="cancel" style="padding: 8px 16px; cursor: pointer; display: flex; align-items: center; gap: 8px; color: #6b7280;">
+        <span>✖</span>
+        <span>取消</span>
+      </div>
+    `;
+    document.body.appendChild(menu);
+
+    // 悬停效果
+    menu.querySelectorAll('.vertex-menu-item').forEach((item) => {
+      item.addEventListener('mouseenter', () => {
+        (item as HTMLElement).style.background = '#f3f4f6';
+      });
+      item.addEventListener('mouseleave', () => {
+        (item as HTMLElement).style.background = 'transparent';
+      });
+    });
+
+    // 绑定事件
+    const closeMenu = () => menu.remove();
+
+    menu.querySelector('[data-action="delete"]')?.addEventListener('click', () => {
       if (this.onVertexDelete) {
         this.onVertexDelete(vertexIdx);
       }
-    }
-  };
+      closeMenu();
+    });
+
+    menu.querySelector('[data-action="cancel"]')?.addEventListener('click', closeMenu);
+
+    // 点击其他地方关闭
+    setTimeout(() => {
+      const clickHandler = (e: MouseEvent) => {
+        if (!menu.contains(e.target as Node)) {
+          closeMenu();
+          document.removeEventListener('click', clickHandler);
+        }
+      };
+      document.addEventListener('click', clickHandler);
+    }, 0);
+
+    // ESC 关闭
+    const escHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeMenu();
+        document.removeEventListener('keydown', escHandler);
+      }
+    };
+    document.addEventListener('keydown', escHandler);
+  }
 
   /** 地图点击添加顶点 */
   private handleMapClickForAddVertex = (e: maplibregl.MapMouseEvent): void => {
@@ -1149,17 +1248,27 @@ export class GeoRenderer {
     if (geometry.type === 'Polygon' || geometry.type === 'MultiPolygon' ||
         geometry.type === 'LineString' || geometry.type === 'MultiLineString') {
 
+      // 保存旧的几何（用于历史记录）
+      const oldGeometry = JSON.parse(JSON.stringify(geometry));
+
       const result = this.insertVertexOnNearestEdge(geometry, clickCoord);
       if (result) {
         this.vertexJustAdded = true;
         setTimeout(() => { this.vertexJustAdded = false; }, 150);
 
+        // 更新编辑中的要素几何
         this.editingFeature.geometry = result.geometry;
+        
+        // 更新图层源数据
         this.updateLayerSource(this.editingLayerId, this.editingFeatureIndex, this.editingFeature);
+        
+        // 刷新顶点显示
         this.refreshVertexDisplay();
 
+        // 记录历史（使用旧的几何）
         if (this.onVertexUpdate) {
-          this.onVertexUpdate(this.editingLayerId, this.editingFeatureIndex, this.editingFeature.geometry);
+          // 先记录旧几何，再更新为新几何
+          this.onVertexUpdate(this.editingLayerId, this.editingFeatureIndex, oldGeometry, result.geometry);
         }
       }
     }
@@ -1310,8 +1419,22 @@ export class GeoRenderer {
       return;
     }
 
+    // 如果没有保存拖动前的几何，则不记录历史
+    if (!this.preDragGeometry) {
+      return;
+    }
+
+    // 旧几何 = 拖动前保存的几何
+    const oldGeometry = this.preDragGeometry;
+    
+    // 新几何 = 当前编辑后的几何
+    const newGeometry = JSON.parse(JSON.stringify(this.editingFeature.geometry));
+    
+    // 清除保存的几何
+    this.preDragGeometry = null;
+    
     // 通知调用者（会记录到编辑历史）
-    this.onVertexUpdate(this.editingLayerId, this.editingFeatureIndex, this.editingFeature.geometry);
+    this.onVertexUpdate(this.editingLayerId, this.editingFeatureIndex, oldGeometry, newGeometry);
   }
 
   /** 删除顶点 */

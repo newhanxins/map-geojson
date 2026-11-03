@@ -9,26 +9,52 @@ import { DrillDownManager, type BreadcrumbNode, type DrillLevel } from './drill-
 import { StyleManager } from './style-manager';
 import { EditManager } from './edit-manager';
 import { ContextMenu } from '../ui/context-menu';
-import { ENABLE_DRILL_DOWN } from '../config';
 import { toast } from '../ui/toast';
 import { DropZone } from '../ui/drop-zone';
 import { Sidebar } from '../ui/sidebar';
 import { Toolbar } from '../ui/toolbar';
 
+// 编译时注入的下钻功能开关（由 vite.config.ts define 注入）
+// @ts-ignore
+const ENABLE_DRILL_DOWN: boolean = typeof __ENABLE_DRILL_DOWN__ !== 'undefined' ? __ENABLE_DRILL_DOWN__ : true;
+
 /**
  * 应用主控制器
  * 协调所有模块和 UI 的交互
  */
+/**
+ * 应用程序主类
+ * 协调各模块完成 GeoJSON 查看、编辑、下钻等核心功能
+ */
 export class App {
+  /** 地图渲染器 - 负责 MapLibre GL 地图渲染和图层管理 */
   private renderer!: GeoRenderer;
+  
+  /** 图层管理器 - 管理多个 GeoJSON 图层的增删改查 */
   private layerManager: LayerManager;
+  
+  /** 要素检查器 - 处理地图点击要素查询和属性展示 */
   private inspector!: FeatureInspector;
+  
+  /** 侧边栏组件 - 显示图层列表、统计信息、样式编辑和顶点坐标 */
   private sidebar!: Sidebar;
+  
+  /** 顶部工具栏 - 提供导入/导出/简化/编辑等功能按钮 */
   private toolbar!: Toolbar;
+  
+  /** 拖拽区域 - 处理文件拖拽加载功能 */
   private dropZone!: DropZone;
+  
+  /** 下钻管理器（可选）- 处理行政区划下钻功能（编译时控制是否启用） */
   private drillDown?: DrillDownManager;
+  
+  /** 样式管理器 - 管理图层样式（填充/描边/点半径等） */
   private styleManager!: StyleManager;
+  
+  /** 编辑管理器 - 管理编辑历史记录，支持撤销/重做操作 */
   private editManager!: EditManager;
+  
+  /** 右键菜单 - 处理要素和顶点的右键上下文菜单 */
   private contextMenu!: ContextMenu;
 
   // 下钻专用图层 ID
@@ -77,6 +103,8 @@ export class App {
       onRenameLayer: (id, name) => this.handleRenameLayer(id, name),
       onStyleChange: (id, style) => this.handleStyleChange(id, style),
       onResetStyle: (id) => this.handleResetStyle(id),
+      onViewSource: (id) => this.handleViewSource(id),
+      onRefreshLayer: (id) => this.handleRefreshLayer(id),
     });
 
     this.toolbar = new Toolbar('toolbar', {
@@ -155,6 +183,10 @@ export class App {
 
     document.getElementById('btnDeleteSelected')?.addEventListener('click', () => {
       this.handleDeleteSelected();
+    });
+
+    document.getElementById('btnResetLayer')?.addEventListener('click', () => {
+      this.handleResetLayerFromToolbar();
     });
   }
 
@@ -280,13 +312,13 @@ export class App {
             hit.layerId,
             featureIndex >= 0 ? featureIndex : 0,
             fullFeature as unknown as GeoJSON.Feature,
-            (lid, fidx, newGeometry) => {
-              this.handleVertexUpdate(lid, fidx, newGeometry);
+            (lid, fidx, oldGeometry, newGeometry) => {
+              this.handleVertexUpdate(lid, fidx, oldGeometry, newGeometry);
             },
             data as unknown as GeoJSON.FeatureCollection,
             (vertexIndex) => {
               this.handleVertexDelete(vertexIndex);
-            }
+              }
           );
 
           // 更新工具栏状态
@@ -318,6 +350,9 @@ export class App {
           featureIndex: featureIndex >= 0 ? featureIndex : 0,
           feature: fullFeature,
         };
+
+        // 自动选中该图层作为活动图层
+        this.layerManager.setActiveLayer(hit.layerId);
 
         // 高亮要素（使用完整的要素）
         this.renderer.highlightFeature(fullFeature as unknown as GeoJSON.Feature);
@@ -768,10 +803,17 @@ export class App {
   /** 切换编辑模式 */
   private handleToggleEditMode(): void {
     // 必须先选中图层才能进入编辑模式
-    const activeLayer = this.layerManager.getActiveLayer();
+    let activeLayer = this.layerManager.getActiveLayer();
     if (!activeLayer && !this.isEditMode) {
-      toast.warning('请先在右侧选中一个图层，才能进入编辑模式');
-      return;
+      // 如果没有活动图层但有可用图层，自动选中第一个
+      const layers = this.layerManager.getLayers();
+      if (layers.length > 0) {
+        this.layerManager.setActiveLayer(layers[0].id);
+        activeLayer = layers[0];
+      } else {
+        toast.warning('请先在右侧选中一个图层，才能进入编辑模式');
+        return;
+      }
     }
 
     this.isEditMode = !this.isEditMode;
@@ -807,11 +849,16 @@ export class App {
     const btnUndo = document.getElementById('btnUndo') as HTMLButtonElement;
     const btnRedo = document.getElementById('btnRedo') as HTMLButtonElement;
     const btnDelete = document.getElementById('btnDeleteSelected') as HTMLButtonElement;
+    const btnReset = document.getElementById('btnResetLayer') as HTMLButtonElement;
+
+    const hasActiveLayer = this.layerManager.getActiveLayer() !== null;
 
     if (btnSave) btnSave.disabled = !this.isEditMode;
     if (btnUndo) btnUndo.disabled = !this.isEditMode;
     if (btnRedo) btnRedo.disabled = !this.isEditMode;
     if (btnDelete) btnDelete.disabled = !this.isEditMode || !this.selectedFeature;
+    // 重置按钮：编辑模式且有活动图层时启用
+    if (btnReset) btnReset.disabled = !this.isEditMode || !hasActiveLayer;
   }
 
   /** 保存编辑 */
@@ -852,11 +899,43 @@ export class App {
         activeLayer.data = result;
       }
       
-      // 重新渲染
-      this.renderer.removeLayer(activeLayer.id);
-      this.renderer.addLayer(activeLayer);
-      this.refreshUI();
+      // 获取当前编辑状态
+      const editingState = this.renderer.getEditingState();
+      const wasEditingVertices = editingState.isEditing;
+      const editingLayerId = editingState.layerId;
+      const editingFeatureIndex = editingState.featureIndex;
       
+      // 停止顶点编辑（清除旧的顶点标记）
+      this.renderer.stopVertexEditing();
+      
+      // 更新地图源数据
+      const sourceKey = `geo-source-${activeLayer.id}`;
+      const source = this.renderer.getMap().getSource(sourceKey) as maplibregl.GeoJSONSource;
+      if (source) {
+        source.setData(result);
+      }
+      
+      // 如果之前在编辑顶点，重新显示顶点
+      if (wasEditingVertices && editingLayerId === activeLayer.id && editingFeatureIndex !== null) {
+        const data = activeLayer.simplifiedData || activeLayer.data;
+        const feature = data.features[editingFeatureIndex];
+        if (feature) {
+          this.renderer.startVertexEditing(
+            editingLayerId,
+            editingFeatureIndex,
+            feature as unknown as GeoJSON.Feature,
+            (lid, fidx, oldGeometry, newGeometry) => {
+              this.handleVertexUpdate(lid, fidx, oldGeometry, newGeometry);
+            },
+            data as unknown as GeoJSON.FeatureCollection,
+            (vtxIdx) => {
+              this.handleVertexDelete(vtxIdx);
+            }
+          );
+        }
+      }
+      
+      this.refreshUI();
       toast.info('已撤销操作');
     } else {
       toast.info('没有可撤销的操作');
@@ -886,14 +965,43 @@ export class App {
         activeLayer.data = updatedData;
       }
 
-      // 重新渲染
-      this.renderer.removeLayer(activeLayer.id);
-      this.renderer.addLayer(activeLayer);
+      // 获取当前编辑状态
+      const editingState = this.renderer.getEditingState();
+      const wasEditingVertices = editingState.isEditing;
+      const editingLayerId = editingState.layerId;
+      const editingFeatureIndex = editingState.featureIndex;
+      
+      // 停止顶点编辑
+      this.renderer.stopVertexEditing();
+      
+      // 更新地图源数据
+      const sourceKey = `geo-source-${activeLayer.id}`;
+      const source = this.renderer.getMap().getSource(sourceKey) as maplibregl.GeoJSONSource;
+      if (source) {
+        source.setData(updatedData);
+      }
+      
+      // 如果之前在编辑顶点，重新显示顶点
+      if (wasEditingVertices && editingLayerId === activeLayer.id && editingFeatureIndex !== null) {
+        const data = activeLayer.simplifiedData || activeLayer.data;
+        const feature = data.features[editingFeatureIndex];
+        if (feature) {
+          this.renderer.startVertexEditing(
+            editingLayerId,
+            editingFeatureIndex,
+            feature as unknown as GeoJSON.Feature,
+            (lid, fidx, oldGeometry, newGeometry) => {
+              this.handleVertexUpdate(lid, fidx, oldGeometry, newGeometry);
+            },
+            data as unknown as GeoJSON.FeatureCollection,
+            (vtxIdx) => {
+              this.handleVertexDelete(vtxIdx);
+            }
+          );
+        }
+      }
 
-      // 清除高亮
-      this.renderer.clearHighlight();
-      this.selectedFeature = null;
-
+      this.refreshUI();
       toast.success('已重做');
     }
   }
@@ -956,13 +1064,13 @@ export class App {
           layerId,
           featureIndex,
           feature as GeoJSON.Feature,
-          (lid, fidx, newGeometry) => {
-            this.handleVertexUpdate(lid, fidx, newGeometry);
+          (lid, fidx, oldGeometry, newGeometry) => {
+            this.handleVertexUpdate(lid, fidx, oldGeometry, newGeometry);
           },
           layerData as unknown as GeoJSON.FeatureCollection,
           (vertexIndex) => {
             this.handleVertexDelete(vertexIndex);
-          }
+                    }
         );
         toast.info('顶点编辑已启用：拖动圆点修改位置，点击边缘添加顶点，右键圆点删除顶点');
         break;
@@ -1004,29 +1112,35 @@ export class App {
     }
   }
 
-  /** 处理顶点更新（拖动后） */
-  /** 处理顶点更新（拖动结束后记录历史） */
-  private handleVertexUpdate(layerId: string, featureIndex: number, newGeometry: any): void {
+  /** 处理顶点更新（拖动后或添加顶点后） */
+  private handleVertexUpdate(layerId: string, featureIndex: number, oldGeometry: any, newGeometry: any): void {
     const layer = this.layerManager.getLayer(layerId);
     if (!layer) return;
 
-    // 记录编辑历史（不重新渲染，因为 source 已在拖动过程中实时更新）
-    const updatedData = this.editManager.updateFeatureGeometry(
-      layerId,
-      layer,
-      featureIndex,
-      newGeometry
-    );
+    const data = layer.simplifiedData || layer.data;
+    if (featureIndex < 0 || featureIndex >= data.features.length) return;
 
-    if (updatedData) {
-      // 更新图层数据（保持数据同步）
-      if (layer.simplifiedData) {
-        layer.simplifiedData = updatedData;
-      } else {
-        layer.data = updatedData;
-      }
-      // 不再重新渲染图层（已由 geo-renderer 实时更新）
-    }
+    // 构造旧要素和新要素
+    const oldFeature = {
+      ...data.features[featureIndex],
+      geometry: oldGeometry,
+    };
+    const newFeature = {
+      ...data.features[featureIndex],
+      geometry: newGeometry,
+    };
+
+    // 记录编辑历史
+    this.editManager.recordEdit(layerId, {
+      type: 'modify',
+      featureIndex,
+      oldFeature: JSON.parse(JSON.stringify(oldFeature)),
+      newFeature: JSON.parse(JSON.stringify(newFeature)),
+      timestamp: Date.now(),
+    });
+
+    // 更新图层数据（保持数据同步）
+    data.features[featureIndex] = newFeature;
   }
 
   /** 处理删除顶点 */
@@ -1035,6 +1149,10 @@ export class App {
     if (!editingState.isEditing || editingState.layerId === null || editingState.featureIndex === null) {
       return;
     }
+
+    // 保存删除前的几何（用于历史记录）
+    const editingFeatureBefore = this.renderer.getEditingFeature();
+    const oldGeometry = editingFeatureBefore ? JSON.parse(JSON.stringify(editingFeatureBefore.geometry)) : null;
 
     // 执行删除
     const success = this.renderer.removeVertex(vertexIndex);
@@ -1056,8 +1174,11 @@ export class App {
       source.setData(editingData);
     }
 
-    // 记录到编辑历史
-    this.handleVertexUpdate(editingState.layerId, editingState.featureIndex, editingFeature.geometry);
+    // 记录到编辑历史（删除顶点时，旧几何=删除前的，新几何=删除后的）
+    const newGeometry = editingFeature.geometry;
+    if (oldGeometry) {
+      this.handleVertexUpdate(editingState.layerId, editingState.featureIndex, oldGeometry, newGeometry);
+    }
 
     // 重新渲染顶点标记
     this.renderer.stopVertexEditing();
@@ -1069,13 +1190,13 @@ export class App {
         editingState.layerId,
         editingState.featureIndex,
         feature as unknown as GeoJSON.Feature,
-        (lid, fidx, newGeometry) => {
-          this.handleVertexUpdate(lid, fidx, newGeometry);
+        (lid, fidx, oldGeometry, newGeometry) => {
+          this.handleVertexUpdate(lid, fidx, oldGeometry, newGeometry);
         },
         data as unknown as GeoJSON.FeatureCollection,
         (vtxIdx) => {
           this.handleVertexDelete(vtxIdx);
-        }
+                }
       );
     }
 
@@ -1140,8 +1261,14 @@ export class App {
     map.on('contextmenu', (e) => {
       if (!this.isEditMode) return;
 
-      // 编辑顶点时，右键由顶点处理器负责，跳过要素右键菜单
-      if (this.renderer.getEditingState().isEditing) return;
+      // 编辑顶点时，右键由顶点处理器负责，不显示要素菜单
+      // 但也不阻止默认行为，让顶点菜单正常显示
+      const editingState = this.renderer.getEditingState();
+      if (editingState.isEditing) {
+        // 检查是否点击在顶点上，如果是则让顶点处理器处理
+        // 如果不是，则不显示任何菜单
+        return;
+      }
       
       // 阻止浏览器默认右键菜单
       e.originalEvent.preventDefault();
@@ -1323,6 +1450,103 @@ export class App {
     // 刷新 UI
     this.refreshUI();
     toast.info('样式已重置');
+  }
+
+  /** 查看源数据 */
+  private handleViewSource(layerId: string): void {
+    const layer = this.layerManager.getLayer(layerId);
+    if (!layer) {
+      toast.warning('图层不存在');
+      return;
+    }
+    // 显示原始数据（非简化后的）
+    this.sidebar.showSourceModal(layer.name, layer.data);
+  }
+
+  /** 刷新图层（重新渲染，恢复到原始数据） */
+  private handleRefreshLayer(layerId: string): void {
+    const layer = this.layerManager.getLayer(layerId);
+    if (!layer) {
+      toast.warning('图层不存在');
+      return;
+    }
+
+    // 清除简化数据
+    this.layerManager.clearSimplifiedData(layerId);
+
+    // 恢复到原始数据
+    if (layer.originalData) {
+      layer.data = JSON.parse(JSON.stringify(layer.originalData));
+    }
+
+    // 重新渲染
+    this.renderer.removeLayer(layerId);
+    this.renderer.addLayer(layer);
+    this.renderer.fitToLayer(layer);
+
+    // 清除编辑历史
+    this.editManager.clearHistory(layerId);
+
+    // 停止顶点编辑
+    this.renderer.stopVertexEditing();
+
+    // 清除选中状态
+    if (this.selectedFeature?.layerId === layerId) {
+      this.selectedFeature = null;
+      this.renderer.clearHighlight();
+    }
+
+    this.refreshUI();
+    toast.success(`已刷新图层: ${layer.name}`);
+  }
+
+  /** 重置图层到原始数据 */
+  private handleResetLayer(layerId: string): void {
+    const layer = this.layerManager.getLayer(layerId);
+    if (!layer) {
+      toast.warning('图层不存在');
+      return;
+    }
+
+    this.showConfirmDialog(
+      '重置图层',
+      `确定要将 "${layer.name}" 重置为原始数据吗？所有编辑操作将被撤销。`,
+      () => {
+        // 清除简化数据
+        this.layerManager.clearSimplifiedData(layerId);
+
+        // 深拷贝原始数据作为当前数据
+        const originalData = JSON.parse(JSON.stringify(layer.data));
+        layer.data = originalData;
+
+        // 重新渲染
+        this.renderer.removeLayer(layerId);
+        this.renderer.addLayer(layer);
+        this.renderer.fitToLayer(layer);
+
+        // 清除编辑历史
+        this.editManager.clearHistory(layerId);
+
+        // 清除选中状态
+        if (this.selectedFeature?.layerId === layerId) {
+          this.selectedFeature = null;
+          this.renderer.clearHighlight();
+        }
+
+        this.refreshUI();
+        toast.success(`已重置图层: ${layer.name}`);
+      }
+    );
+  }
+
+  /** 从工具栏重置图层 */
+  private handleResetLayerFromToolbar(): void {
+    const activeLayer = this.layerManager.getActiveLayer();
+    if (!activeLayer) {
+      toast.warning('请先选择一个图层');
+      return;
+    }
+    this.handleResetLayer(activeLayer.id);
   }
 
   // ===================== 辅助方法 =====================

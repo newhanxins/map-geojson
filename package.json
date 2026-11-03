@@ -8,10 +8,12 @@
     "build": "vite build",
     "build:ext": "vite build --mode extension",
     "build:ext:dev": "vite build --mode extension-dev",
-    "build:ext:drill": "set VITE_ENABLE_DRILL_DOWN=true&& vite build --mode extension",
     "pack:zip": "npm run build:ext && node scripts/pack-extension.cjs zip",
     "pack:crx": "npm run build:ext && node scripts/pack-extension.cjs crx",
     "pack:both": "npm run build:ext && node scripts/pack-extension.cjs both",
+    "pack:zip:drill": "set VITE_ENABLE_DRILL_DOWN=true&& npm run build:ext && node scripts/pack-extension.cjs zip",
+    "pack:crx:drill": "set VITE_ENABLE_DRILL_DOWN=true&& npm run build:ext && node scripts/pack-extension.cjs crx",
+    "pack:both:drill": "set VITE_ENABLE_DRILL_DOWN=true&& npm run build:ext && node scripts/pack-extension.cjs both",
     "preview": "vite preview",
     "clean": "rimraf dist dist-ext release"
   },

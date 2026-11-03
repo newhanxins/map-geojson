@@ -41,6 +41,8 @@ export interface GeoLayer {
   data: GeoJSONFeatureCollection;
   visible: boolean;
   color: string;
+  /** 原始数据（用于刷新/重置） */
+  originalData?: GeoJSONFeatureCollection;
   /** 简化后的数据缓存 */
   simplifiedData?: GeoJSONFeatureCollection;
   /** 当前简化比例 (0-1, 0=无简化) */

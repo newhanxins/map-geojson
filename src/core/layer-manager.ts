@@ -43,10 +43,14 @@ export class LayerManager {
     const layerColor = color || this.colors[this.colorIndex % this.colors.length];
     this.colorIndex++;
 
+    // 深拷贝保存原始数据
+    const originalData = JSON.parse(JSON.stringify(data));
+
     const layer: GeoLayer = {
       id,
       name: name || `Layer ${this.layers.length + 1}`,
       data,
+      originalData,
       visible: true,
       color: layerColor,
     };

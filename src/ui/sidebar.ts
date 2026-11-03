@@ -17,6 +17,8 @@ export class Sidebar {
   private onRenameLayer: (layerId: string, name: string) => void;
   private onStyleChange: (layerId: string, style: Partial<LayerStyle>) => void;
   private onResetStyle: (layerId: string) => void;
+  private onViewSource: (layerId: string) => void;
+  private onRefreshLayer: (layerId: string) => void;
 
   constructor(
     containerId: string,
@@ -29,6 +31,8 @@ export class Sidebar {
       onRenameLayer: (layerId: string, name: string) => void;
       onStyleChange: (layerId: string, style: Partial<LayerStyle>) => void;
       onResetStyle: (layerId: string) => void;
+      onViewSource: (layerId: string) => void;
+      onRefreshLayer: (layerId: string) => void;
     }
   ) {
     this.container = document.getElementById(containerId)!;
@@ -40,6 +44,8 @@ export class Sidebar {
     this.onRenameLayer = callbacks.onRenameLayer;
     this.onStyleChange = callbacks.onStyleChange;
     this.onResetStyle = callbacks.onResetStyle;
+    this.onViewSource = callbacks.onViewSource;
+    this.onRefreshLayer = callbacks.onRefreshLayer;
   }
 
   /** 渲染图层列表和统计信息 */
@@ -80,6 +86,8 @@ export class Sidebar {
               </span>
               <span class="layer-count">${featureCount}</span>
               <div class="layer-actions">
+                <button data-action="view-source" data-layer-id="${layer.id}" title="查看源数据">&#128065;</button>
+                <button data-action="refresh" data-layer-id="${layer.id}" title="刷新图层">&#8635;</button>
                 <button data-action="fit" data-layer-id="${layer.id}" title="缩放至图层">&#128269;</button>
                 <button data-action="remove" data-layer-id="${layer.id}" title="删除图层">&#10005;</button>
                 <button class="toggle-panel-btn" data-action="toggle-panel" data-layer-id="${layer.id}" title="展开/折叠">
@@ -163,7 +171,7 @@ export class Sidebar {
                   </div>
                 </div>
               </div>
-            ` : ''}
+            ` : ''}          
           </div>
         `;
       }
@@ -281,6 +289,12 @@ export class Sidebar {
           case 'fit':
             this.onFitToLayer(layerId);
             break;
+          case 'view-source':
+            this.onViewSource(layerId);
+            break;
+          case 'refresh':
+            this.onRefreshLayer(layerId);
+            break;
         }
       });
     });
@@ -391,5 +405,84 @@ export class Sidebar {
         }
       });
     });
+  }
+
+  /** 显示源数据弹窗 */
+  showSourceModal(layerName: string, data: object): void {
+    const jsonStr = JSON.stringify(data, null, 2);
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay source-modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal source-modal">
+        <div class="source-modal-header">
+          <h2>📄 ${this.escapeHtml(layerName)} - 源数据</h2>
+          <button class="source-modal-close">&times;</button>
+        </div>
+        <div class="source-modal-toolbar">
+          <button class="btn btn-primary source-copy-btn">📋 复制内容</button>
+          <span class="source-char-count">${jsonStr.length.toLocaleString()} 字符</span>
+        </div>
+        <div class="source-modal-content">
+          <pre class="source-code">${this.escapeHtml(jsonStr)}</pre>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    // 绑定事件
+    const closeBtn = overlay.querySelector('.source-modal-close');
+    const copyBtn = overlay.querySelector('.source-copy-btn');
+
+    const closeModal = () => overlay.remove();
+
+    closeBtn?.addEventListener('click', closeModal);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeModal();
+    });
+
+    copyBtn?.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(jsonStr);
+        (copyBtn as HTMLElement).textContent = '✅ 已复制';
+        setTimeout(() => {
+          (copyBtn as HTMLElement).textContent = '📋 复制内容';
+        }, 2000);
+      } catch {
+        // 回退方案
+        const textarea = document.createElement('textarea');
+        textarea.value = jsonStr;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        textarea.remove();
+        (copyBtn as HTMLElement).textContent = '✅ 已复制';
+        setTimeout(() => {
+          (copyBtn as HTMLElement).textContent = '📋 复制内容';
+        }, 2000);
+      }
+    });
+
+    // ESC 关闭
+    const escHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeModal();
+        document.removeEventListener('keydown', escHandler);
+      }
+    };
+    document.addEventListener('keydown', escHandler);
+  }
+
+  /** HTML 转义 */
+  private escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  /** 更新顶点坐标显示 */
+  updateVertexCoord(layerId: string, coord: number[] | null, region: string | null = null): void {
+    console.log('[updateVertexCoord] 被调用, layerId:', layerId, 'coord:', coord);
+    
+    
   }
 }

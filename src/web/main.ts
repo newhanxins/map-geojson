@@ -11,6 +11,7 @@ import '../styles/compact-layout.css';
 import '../styles/edit-tools.css';
 import '../styles/feature-card.css';
 import '../styles/map-toolbar.css';
+import '../styles/source-modal.css';
 
 // MapLibre GL CSS (通过 link 标签在 HTML 中加载)
 

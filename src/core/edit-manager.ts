@@ -251,9 +251,10 @@ export class EditManager {
       return null;
     }
 
-    const oldFeature = { ...data.features[featureIndex] };
+    // 深拷贝旧要素（避免引用问题）
+    const oldFeature = JSON.parse(JSON.stringify(data.features[featureIndex]));
     const newFeature = {
-      ...oldFeature,
+      ...data.features[featureIndex],
       geometry: newGeometry,
     };
 
