@@ -15,6 +15,9 @@
 - **省市区下钻**: 点击省份/城市逐级深入到区县（可选功能，详见 [下钻功能配置](./DRILL_DOWN_GUIDE.md)）
 - **数据校验**: 智能检测导入数据的格式和内容错误，提供详细的中文错误提示
 - **Chrome 扩展**: 自动检测网页中的 GeoJSON 链接，快速粘贴预览
+- **顶点编辑**: 支持移动、添加、删除顶点，Ctrl+Z/Y 撤销/重做，图层重置到原始数据
+- **样式自定义**: 可调整图层填充色、描边色、透明度、点半径等样式属性
+- **右键菜单**: 丰富的上下文菜单操作，包括要素编辑、图层管理等
 
 ## 技术栈
 
@@ -281,9 +284,9 @@ npm run pack:zip
 | `npm run build` | production | `dist/` | ✅ 默认启用 | 压缩后的网页构建 |
 | `npm run build:ext` | extension | `dist-ext/` | ❌ 默认禁用 | 生产环境 Chrome 扩展 |
 | `npm run build:ext:dev` | extension-dev | `dist-ext/` | ❌ 默认禁用 | 开发环境扩展（含 sourcemap） |
-| `npm run build:ext:drill` | extension | `dist-ext/` | ✅ 强制启用 | 带下钻功能的 Chrome 扩展 |
+| `npm run build:ext:drill` | extension | `dist-ext/` | ✅ 强制启用 | 带下钻功能的 Chrome 扩展
 
-> 💡 **关于下钻功能**：省市区下钻需要约 3600 个 GeoJSON 文件（100-200MB）。Chrome 扩展默认禁用此功能以减小包体积。详见 [下钻功能配置指南](./DRILL_DOWN_GUIDE.md)。
+> 💡 **关于下钻功能**：省市区下钻需要约 3600 个 GeoJSON 文件（100-200MB）。Chrome 扩展默认禁用此功能以减小包体积。可使用 `npm run build:ext:drill` 快速构建带下钻功能的扩展，或通过 `.env` 文件设置 `VITE_ENABLE_DRILL_DOWN=true` 启用。详见 [下钻功能配置指南](./DRILL_DOWN_GUIDE.md)。
 
 ## 项目架构
 
@@ -309,6 +312,9 @@ graph TD
     D --> M[GeoSimplify 形状简化]
     D --> N[GeoStats 数据统计]
     D --> O[Exporter 导出工具]
+    D --> SM[StyleManager 样式管理]
+    D --> EM[EditManager 编辑管理]
+    D --> CM[ContextMenu 右键菜单]
 
     I --> P[GeoJSON / TopoJSON 解析]
     J --> Q[MapLibre GL JS]
@@ -400,14 +406,29 @@ geo-viewer/
 │   │   ├── geo-simplify.ts      # Douglas-Peucker + Visvalingam 简化算法
 │   │   ├── exporter.ts          # GeoJSON/TopoJSON 导出工具
 │   │   ├── drill-down.ts        # 省市区下钻功能（可选）
+│   │   ├── style-manager.ts     # 图层样式管理（填充/描边/点样式）
+│   │   ├── edit-manager.ts      # 编辑历史管理（撤销/重做）
+│   │   ├── context-menu-actions.ts # 右键菜单动作处理
 │   │   └── types.ts             # TypeScript 类型定义
 │   ├── ui/                      # DOM UI 组件
 │   │   ├── sidebar.ts           # 图层列表 + 统计信息面板
 │   │   ├── toolbar.ts           # 顶部操作工具栏
 │   │   ├── properties-panel.ts  # 底部要素属性面板
 │   │   ├── drop-zone.ts         # 拖拽上传覆盖层
-│   │   └── toast.ts             # Toast 消息提示
-│   ├── styles/                  # CSS 样式文件
+│   │   ├── toast.ts             # Toast 消息提示
+│   │   ├── context-menu.ts      # 右键上下文菜单
+│   │   └── style-editor.ts      # 样式编辑器组件
+│   ├── styles/                  # CSS 样式文件（10个）
+│   │   ├── main.css            # 主样式
+│   │   ├── sidebar.css         # 侧边栏样式
+│   │   ├── toolbar.css         # 工具栏样式
+│   │   ├── compact-layout.css  # 紧凑布局样式
+│   │   ├── edit-tools.css      # 编辑工具样式
+│   │   ├── feature-card.css    # 要素卡片样式
+│   │   ├── map-toolbar.css     # 地图工具栏样式
+│   │   ├── source-modal.css    # 源模态框样式
+│   │   ├── variables.css       # CSS 变量定义
+│   │   └── temp.css            # 临时样式
 │   ├── web/main.ts              # 网页应用入口
 │   └── extension/               # Chrome 扩展模块
 │       ├── manifest.json        # Manifest V3 配置

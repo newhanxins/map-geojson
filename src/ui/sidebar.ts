@@ -478,11 +478,4 @@ export class Sidebar {
     div.textContent = text;
     return div.innerHTML;
   }
-
-  /** 更新顶点坐标显示 */
-  updateVertexCoord(layerId: string, coord: number[] | null, region: string | null = null): void {
-    console.log('[updateVertexCoord] 被调用, layerId:', layerId, 'coord:', coord);
-    
-    
-  }
 }

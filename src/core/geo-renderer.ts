@@ -323,7 +323,7 @@ export class GeoRenderer {
     this.map.on('mouseout', () => this.hideTooltip());
   }
 
-  /** 显示提示框 */
+  /** 显示提示框 地图要素悬浮显示 */
   private showTooltip(title: string, props: [string, unknown][], event: MouseEvent): void {
     if (!this.tooltipEl) return;
 
@@ -1010,20 +1010,27 @@ export class GeoRenderer {
   }
 
   /** 获取鼠标下的顶点索引（使用 BBOX 查询提高容错） */
-  private queryVertexAtPoint(point: maplibregl.PointLike): number | null {
-    // 使用 10x10 像素的包围盒查询，提高点击容错
+  queryVertexAtPoint(point: maplibregl.PointLike): number | null {
+    // 使用 20x20 像素的包围盒查询，提高点击容错
     const px = (point as any).x ?? (point as number[])[0];
     const py = (point as any).y ?? (point as number[])[1];
     const bbox: [maplibregl.PointLike, maplibregl.PointLike] = [
-      [px - 8, py - 8],
-      [px + 8, py + 8],
+      [px - 12, py - 12],
+      [px + 12, py + 12],
     ];
+    console.log('[queryVertexAtPoint] querying at', { x: px, y: py, bbox });
+    
     const features = this.map.queryRenderedFeatures(bbox, {
       layers: [GeoRenderer.VERTEX_LAYER],
     });
+    console.log('[queryVertexAtPoint] found', features.length, 'features');
+    
     if (features.length > 0 && features[0].properties) {
-      return features[0].properties.index as number;
+      const idx = features[0].properties.index as number;
+      console.log('[queryVertexAtPoint] returning index:', idx);
+      return idx;
     }
+    console.log('[queryVertexAtPoint] no vertex found');
     return null;
   }
 
@@ -1112,14 +1119,17 @@ export class GeoRenderer {
 
     const vertexIdx = this.queryVertexAtPoint(e.point);
     if (vertexIdx !== null) {
-      e.preventDefault();
-      this.draggingVertexIndex = vertexIdx;
-      this.map.dragPan.disable();
-      this.map.getCanvas().style.cursor = 'grabbing';
-      
-      // 保存拖动前的几何（用于历史记录）
-      if (this.editingFeature) {
-        this.preDragGeometry = JSON.parse(JSON.stringify(this.editingFeature.geometry));
+      // 只在左键点击时阻止默认行为，右键点击时允许 contextmenu 事件触发
+      if (e.originalEvent.button === 0) {
+        e.preventDefault();
+        this.draggingVertexIndex = vertexIdx;
+        this.map.dragPan.disable();
+        this.map.getCanvas().style.cursor = 'grabbing';
+        
+        // 保存拖动前的几何（用于历史记录）
+        if (this.editingFeature) {
+          this.preDragGeometry = JSON.parse(JSON.stringify(this.editingFeature.geometry));
+        }
       }
     }
   };
@@ -1141,8 +1151,10 @@ export class GeoRenderer {
   };
 
   private onVertexContextMenu = (e: maplibregl.MapMouseEvent): void => {
+    console.log('[onVertexContextMenu] triggered, isEditingVertices:', this.isEditingVertices);
+    
     if (!this.isEditingVertices) {
-      console.log('[onVertexContextMenu] not editing vertices');
+      console.log('[onVertexContextMenu] not editing vertices, return');
       return;
     }
 
@@ -1155,8 +1167,10 @@ export class GeoRenderer {
       e.originalEvent.preventDefault();
       
       // 显示顶点操作菜单
-      console.log('[onVertexContextMenu] showing menu');
+      console.log('[onVertexContextMenu] showing menu at', e.originalEvent.clientX, e.originalEvent.clientY);
       this.showVertexContextMenu(e.originalEvent.clientX, e.originalEvent.clientY, vertexIdx);
+    } else {
+      console.log('[onVertexContextMenu] no vertex found at point');
     }
   };
 

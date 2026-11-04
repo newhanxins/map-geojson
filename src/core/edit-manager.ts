@@ -63,6 +63,11 @@ export class EditManager {
         icon: '↔️',
         action: 'move-feature',
       },
+      {
+        label: '移动整个图层',
+        icon: '🗺️',
+        action: 'move-layer',
+      },
       { separator: true, label: '', icon: '', action: '' },
       {
         label: '删除区域',

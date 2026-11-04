@@ -5,6 +5,38 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GeoJSON 查看器</title>
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+  <!-- 内联关键样式，避免 FOUC -->
+  <style>
+    /* 基础布局重置 */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, #app { height: 100%; width: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    
+    /* 工具栏 */
+    .toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #fff; border-bottom: 1px solid #e5e7eb; height: 48px; }
+    
+    /* 主体布局 */
+    .app-body { display: flex; height: calc(100vh - 48px); }
+    
+    /* 地图容器 */
+    .map-container { flex: 1; position: relative; min-width: 0; }
+    #map { width: 100%; height: 100%; }
+    
+    /* 右侧面板 */
+    .right-panel { width: 320px; min-width: 280px; max-width: 400px; background: #fff; border-left: 1px solid #e5e7eb; display: flex; flex-direction: column; overflow-y: auto; }
+    
+    /* 拖拽覆盖层 */
+    .drop-overlay { position: fixed; inset: 0; background: rgba(59, 130, 246, 0.1); backdrop-filter: blur(4px); z-index: 9999; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+    .drop-overlay.active { pointer-events: all; }
+    .drop-overlay-content { background: #fff; border-radius: 12px; padding: 40px 60px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.15); }
+    .drop-icon { font-size: 64px; display: block; margin-bottom: 16px; }
+    .drop-overlay-content p { font-size: 18px; color: #374151; margin: 0; }
+    
+    /* 隐藏文件输入 */
+    .file-input-hidden { display: none; }
+    
+    /* 简化控制栏 */
+    .simplify-bar { display: none; }
+  </style>
 </head>
 <body>
   <div id="app">

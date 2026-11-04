@@ -13,6 +13,7 @@ import { toast } from '../ui/toast';
 import { DropZone } from '../ui/drop-zone';
 import { Sidebar } from '../ui/sidebar';
 import { Toolbar } from '../ui/toolbar';
+import { handleEditVertices, handleStopEditing, handleMoveFeature, handleMoveLayer, handleAddVertex, handleResetFeature } from './context-menu-actions';
 
 // 编译时注入的下钻功能开关（由 vite.config.ts define 注入）
 // @ts-ignore
@@ -1060,35 +1061,75 @@ export class App {
     switch (action) {
       case 'edit-vertices':
         // 开始编辑顶点
-        this.renderer.startVertexEditing(
+        handleEditVertices(
+          this.renderer,
           layerId,
           featureIndex,
           feature as GeoJSON.Feature,
+          layerData as unknown as GeoJSON.FeatureCollection,
           (lid, fidx, oldGeometry, newGeometry) => {
             this.handleVertexUpdate(lid, fidx, oldGeometry, newGeometry);
           },
-          layerData as unknown as GeoJSON.FeatureCollection,
           (vertexIndex) => {
             this.handleVertexDelete(vertexIndex);
-                    }
+          }
         );
         toast.info('顶点编辑已启用：拖动圆点修改位置，点击边缘添加顶点，右键圆点删除顶点');
         break;
 
       case 'stop-editing':
         // 停止编辑顶点
-        this.renderer.stopVertexEditing();
+        handleStopEditing(this.renderer);
         toast.info('顶点编辑已停止');
         break;
 
       case 'move-feature':
         // 区域移动：启用拖动模式
-        this.enableFeatureMove(layerId, featureIndex, feature as GeoJSON.Feature);
+        const map = this.renderer.getMap();
+        handleMoveFeature(
+          map,
+          layerId,
+          featureIndex,
+          feature as GeoJSON.Feature,
+          (feat) => this.renderer.highlightFeature(feat),
+          (lid, op) => this.editManager.recordEdit(lid, op),
+          (lid) => {
+            const layer = this.layerManager.getLayer(lid);
+            return layer ? (layer.simplifiedData || layer.data) : null;
+          }
+        );
+        break;
+
+      case 'move-layer':
+        // 移动整个图层
+        const moveLayerMap = this.renderer.getMap();
+        handleMoveLayer(
+          moveLayerMap,
+          layerId,
+          (feat) => this.renderer.highlightFeature(feat),
+          (lid, op) => this.editManager.recordEdit(lid, op),
+          (lid) => {
+            const layer = this.layerManager.getLayer(lid);
+            return layer ? (layer.simplifiedData || layer.data) : null;
+          }
+        );
         break;
 
       case 'add-vertex':
         // 添加顶点
-        this.handleAddVertex(layerId, featureIndex, feature as GeoJSON.Feature);
+        const addMap = this.renderer.getMap();
+        handleAddVertex(
+          addMap,
+          layerId,
+          featureIndex,
+          feature as GeoJSON.Feature,
+          (feat) => this.renderer.highlightFeature(feat),
+          (lid, op) => this.editManager.recordEdit(lid, op),
+          (lid) => {
+            const layer = this.layerManager.getLayer(lid);
+            return layer ? (layer.simplifiedData || layer.data) : null;
+          }
+        );
         break;
 
       case 'delete-feature':
@@ -1098,12 +1139,15 @@ export class App {
 
       case 'reset-feature':
         // 重置为原始数据
-        const originalData = layer.data;
-        const updatedData = this.editManager.resetFeature(layerId, layer, featureIndex, originalData);
-        if (updatedData) {
-          this.refreshLayerRendering(layer);
-          toast.success('已重置为源数据');
-        }
+        handleResetFeature(
+          layerId,
+          featureIndex,
+          layer.data,
+          this.editManager,
+          (lyr) => this.refreshLayerRendering(lyr),
+          (lid) => this.layerManager.getLayer(lid)
+        );
+        toast.success('已重置为源数据');
         break;
 
       case 'undo':
@@ -1203,22 +1247,6 @@ export class App {
     toast.success('顶点已删除');
   }
 
-  /** 启用要素移动模式 */
-  private enableFeatureMove(layerId: string, featureIndex: number, feature: GeoJSON.Feature): void {
-    toast.info('区域移动：拖动地图上的要素到新位置（功能实现中）');
-    
-    // TODO: 实现拖动整个要素的逻辑
-    // 需要使用 MapLibre Draw 插件或手动实现
-  }
-
-  /** 添加顶点 */
-  private handleAddVertex(layerId: string, featureIndex: number, feature: GeoJSON.Feature): void {
-    toast.info('添加顶点：点击地图上的边添加新点（功能实现中）');
-    
-    // TODO: 实现添加顶点的逻辑
-    // 监听地图点击事件，在边上插入新点
-  }
-
   /** 刷新图层渲染 */
   private refreshLayerRendering(layer: any): void {
     this.renderer.removeLayer(layer.id);
@@ -1259,14 +1287,25 @@ export class App {
     const map = this.renderer.getMap();
 
     map.on('contextmenu', (e) => {
-      if (!this.isEditMode) return;
-
-      // 编辑顶点时，右键由顶点处理器负责，不显示要素菜单
-      // 但也不阻止默认行为，让顶点菜单正常显示
+      console.log('[app contextmenu] triggered at', e.point);
+      
+      // 编辑顶点时，检查是否点击在顶点上
       const editingState = this.renderer.getEditingState();
+      console.log('[app contextmenu] isEditing:', editingState.isEditing);
+      
       if (editingState.isEditing) {
-        // 检查是否点击在顶点上，如果是则让顶点处理器处理
-        // 如果不是，则不显示任何菜单
+        // 使用 geo-renderer 的 queryVertexAtPoint 方法检查是否点击在顶点上
+        const vertexIdx = this.renderer.queryVertexAtPoint(e.point);
+        console.log('[app contextmenu] vertexIdx:', vertexIdx);
+        
+        if (vertexIdx !== null) {
+          // 点击在顶点上，由 geo-renderer 的 onVertexContextMenu 处理
+          // 不阻止默认行为，让顶点处理器决定是否阻止
+          console.log('[app contextmenu] skipping, let geo-renderer handle');
+          return;
+        }
+        // 点击不在顶点上，但在编辑模式下，不显示要素菜单
+        console.log('[app contextmenu] in edit mode but not on vertex, skip feature menu');
         return;
       }
       
